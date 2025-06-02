@@ -1,15 +1,12 @@
-// internal/config/config.go
+// internal/config/config.go - Simplified to use only environment variables
 package config
 
 import (
 	"os"
 	"strconv"
-	"strings"
-
-	"github.com/MegaPDF/megapdf-official/api/internal/db"
 )
 
-// Config holds all the application configuration
+// Config holds all the application configuration from environment variables
 type Config struct {
 	Port               int
 	JWTSecret          string
@@ -46,7 +43,7 @@ type Config struct {
 	DBConnMaxLifetime string
 }
 
-// LoadConfig loads configuration from environment variables
+// LoadConfig loads configuration from environment variables only
 func LoadConfig() *Config {
 	port, _ := strconv.Atoi(getEnv("PORT", "8080"))
 	smtpPort, _ := strconv.Atoi(getEnv("SMTP_PORT", "587"))
@@ -72,7 +69,7 @@ func LoadConfig() *Config {
 		SMTPSecure:         getEnv("SMTP_SECURE", "false") == "true",
 		EmailFrom:          getEnv("EMAIL_FROM", "noreply@mega-pdf.com"),
 		ContactRecipient:   getEnv("CONTACT_RECIPIENT_EMAIL", ""),
-		AppURL:             getEnv("APP_URL", "http://localhost:8080"),
+		AppURL:             getEnv("APP_URL", "http://localhost:3000"),
 		APIUrl:             getEnv("API_URL", "http://localhost:8080"),
 		Debug:              getEnv("DEBUG", "false") == "true",
 		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
@@ -82,8 +79,8 @@ func LoadConfig() *Config {
 		// Database config
 		DBHost:            getEnv("DB_HOST", "127.0.0.1"),
 		DBPort:            dbPort,
-		DBName:            getEnv("DB_NAME", ""),
-		DBUser:            getEnv("DB_USER", ""),
+		DBName:            getEnv("DB_NAME", "megapdf"),
+		DBUser:            getEnv("DB_USER", "root"),
 		DBPassword:        getEnv("DB_PASSWORD", ""),
 		DBCharset:         getEnv("DB_CHARSET", "utf8mb4"),
 		DBCollation:       getEnv("DB_COLLATION", "utf8mb4_unicode_ci"),
@@ -94,12 +91,6 @@ func LoadConfig() *Config {
 	}
 }
 
-// InitDB initializes the database with the config settings
-func InitDB() error {
-	_, err := db.InitDB()
-	return err
-}
-
 // getEnv gets an environment variable or returns a default value
 func getEnv(key, defaultValue string) string {
 	value := os.Getenv(key)
@@ -107,13 +98,4 @@ func getEnv(key, defaultValue string) string {
 		return defaultValue
 	}
 	return value
-}
-
-// GetEnvAsSlice splits a comma-separated environment variable into a slice
-func GetEnvAsSlice(key, defaultValue string) []string {
-	value := getEnv(key, defaultValue)
-	if value == "" {
-		return []string{}
-	}
-	return strings.Split(value, ",")
 }

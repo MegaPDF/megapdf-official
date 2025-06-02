@@ -1,11 +1,13 @@
-// internal/routes/routes.go
+// internal/routes/routes.go - Simplified without database settings
 package routes
 
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,7 +53,6 @@ func ResetCustomPricing(c *gin.Context) {
 	})
 }
 
-// Add to your routes (or run as a test)
 func DebugCustomPrices(c *gin.Context) {
 	pricingRepo := repository.NewPricingRepository()
 	pricing, err := pricingRepo.GetPricingSettings()
@@ -62,32 +63,35 @@ func DebugCustomPrices(c *gin.Context) {
 		return
 	}
 
-	// List all custom prices
 	c.JSON(http.StatusOK, gin.H{
-		"globalPrice":  pricing.OperationCost,
-		"customPrices": pricing.CustomPrices,
-		// Check specifically for compress
+		"globalPrice":   pricing.OperationCost,
+		"customPrices":  pricing.CustomPrices,
 		"compressPrice": pricing.CustomPrices["compress"],
 	})
 }
+
 func maskPassword(password string) string {
 	if password != "" {
 		return "********"
 	}
 	return "[not set]"
 }
+
 func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
-	// Add route logging
-	fmt.Println("Setting up routes...")
-	// Initialize email service with additional logging
-	fmt.Println("Initializing email service with config:")
+	fmt.Println("Setting up simplified routes with environment variables...")
+
+	// Log configuration (from environment variables)
+	fmt.Println("Configuration loaded from environment variables:")
 	fmt.Printf("  SMTP Host: %s\n", cfg.SMTPHost)
 	fmt.Printf("  SMTP Port: %d\n", cfg.SMTPPort)
-	fmt.Printf("  SMTP User: %s\n", cfg.SMTPUser)               // Log just presence, not the actual username
-	fmt.Printf("  SMTP Pass: %s\n", maskPassword(cfg.SMTPPass)) // Mask password for security
+	fmt.Printf("  SMTP User: %s\n", cfg.SMTPUser)
+	fmt.Printf("  SMTP Pass: %s\n", maskPassword(cfg.SMTPPass))
 	fmt.Printf("  Email From: %s\n", cfg.EmailFrom)
 	fmt.Printf("  App URL: %s\n", cfg.AppURL)
+	fmt.Printf("  API URL: %s\n", cfg.APIUrl)
 	fmt.Printf("  Debug Mode: %v\n", cfg.Debug)
+	fmt.Printf("  JWT Secret: %s\n", maskPassword(cfg.JWTSecret))
+
 	// Apply CORS middleware globally
 	r.Use(middleware.CORSMiddleware())
 	r.Use(middleware.LoggerMiddleware())
@@ -99,6 +103,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		})
 		c.Next()
 	})
+
 	// Set development mode info in context
 	mode := "production"
 	if cfg.Debug {
@@ -113,6 +118,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			c.Next()
 		})
 	}
+
 	r.LoadHTMLGlob("templates/*")
 	fmt.Println("Loaded HTML templates from api/templates/")
 	fmt.Println("Running in", mode, "mode")
@@ -134,10 +140,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	fileHandler := handlers.NewFileHandler(cfg)
 	adminHandler := handlers.NewAdminHandler()
 	paypalWebhookHandler := handlers.NewPayPalWebhookHandler()
+
 	fmt.Println("Setting email service on auth handler")
 	authHandler.SetEmailService(emailService)
+
 	pdfToolsHandler := handlers.NewPDFToolsHandler()
-	settingsHandler := handlers.NewSettingsHandler()
 	ocrHandler := handlers.NewOcrHandler(balanceService, cfg)
 	toolStatusHandler := handlers.NewToolStatusHandler()
 	pdfTextEditorHandler := handlers.NewPDFTextEditorHandler(balanceService, cfg)
@@ -148,27 +155,36 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		cfg.UploadDir,
 		filepath.Join(cfg.PublicDir, "signatures"),
 	)
+
+	if balanceHandlerType := reflect.TypeOf(balanceHandler); balanceHandlerType != nil {
+		if method, exists := balanceHandlerType.MethodByName("SetEmailService"); exists {
+			fmt.Println("Setting email service on balance handler")
+			reflect.ValueOf(balanceHandler).Method(method.Index).Call([]reflect.Value{reflect.ValueOf(emailService)})
+		} else {
+			fmt.Println("Balance handler does not have SetEmailService method yet")
+		}
+	}
+
 	api := r.Group("/api")
 	{
 		api.GET("/tools/status", toolStatusHandler.GetToolStatus)
-		fmt.Println("Registering route: /api/validate-key")
 		api.POST("/validate-key", keyValidationHandler.ValidateKey)
 		api.GET("/validate-key", keyValidationHandler.ValidateKey)
-		fmt.Println("Registering route: /api/validate-token")
 		api.POST("/webhooks/paypal", paypalWebhookHandler.HandleWebhook)
-		api.GET("/validate-token", func(c *gin.Context) {
-			// Get token from cookie
-			token, err := c.Cookie("authToken")
 
-			// If no cookie, try from Authorization header
-			if err != nil {
+		// Simplified token validation without database settings dependency
+		api.GET("/validate-token", func(c *gin.Context) {
+			var token string
+			cookieToken, err := c.Cookie("authToken")
+			if err == nil && cookieToken != "" {
+				token = cookieToken
+			} else {
 				authHeader := c.GetHeader("Authorization")
 				if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
 					token = strings.TrimPrefix(authHeader, "Bearer ")
 				}
 			}
 
-			// No token found
 			if token == "" {
 				c.JSON(http.StatusUnauthorized, gin.H{
 					"valid": false,
@@ -177,9 +193,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 				return
 			}
 
-			// Validate the token
 			userID, err := authService.ValidateToken(token)
 			if err != nil {
+				fmt.Printf("[AUTH] Token validation failed: %v\n", err)
 				c.JSON(http.StatusUnauthorized, gin.H{
 					"valid": false,
 					"error": "Invalid token",
@@ -187,7 +203,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 				return
 			}
 
-			// Get user data to include role
 			var user models.User
 			if err := db.First(&user, "id = ?", userID).Error; err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{
@@ -197,75 +212,56 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 				return
 			}
 
-			// Token is valid
 			c.JSON(http.StatusOK, gin.H{
 				"valid":  true,
 				"userId": userID,
 				"role":   user.Role,
 			})
 		})
-		if balanceHandlerType := reflect.TypeOf(balanceHandler); balanceHandlerType != nil {
-			if method, exists := balanceHandlerType.MethodByName("SetEmailService"); exists {
-				fmt.Println("Setting email service on balance handler")
-				reflect.ValueOf(balanceHandler).Method(method.Index).Call([]reflect.Value{reflect.ValueOf(emailService)})
-			} else {
-				fmt.Println("Balance handler does not have SetEmailService method yet")
-			}
-		}
 
-		fmt.Println("Registering route: /api/file")
 		api.GET("/file", fileHandler.ServeFile)
-		fmt.Println("Registering route: /api/track-usage")
 		api.GET("/track-usage", middleware.AuthMiddleware(cfg.JWTSecret), trackUsageHandler.GetUsageStats)
 		api.POST("/track-usage", middleware.AuthMiddleware(cfg.JWTSecret), trackUsageHandler.TrackOperation)
-		fmt.Println("Registering route: /api/ocr")
 		api.POST("/ocr", middleware.ApiKeyMiddleware(keyValidationService), ocrHandler.OcrPdf)
-		fmt.Println("Registering route: /api/ocr/extract")
 		api.POST("/ocr/extract", middleware.ApiKeyMiddleware(keyValidationService), ocrHandler.ExtractText)
 		api.GET("/pricing", adminHandler.GetPricingSettings)
 
 		auth := api.Group("/auth")
 		{
-			fmt.Println("Registering route: /api/auth/google")
 			auth.GET("/google", oauthHandler.GoogleAuth)
-
-			fmt.Println("Registering route: /api/auth/google/callback")
 			auth.GET("/google/callback", oauthHandler.GoogleCallback)
-			fmt.Println("Registering route: /api/auth/register")
 			auth.POST("/register", authHandler.Register)
-
-			fmt.Println("Registering route: /api/auth/login")
 			auth.POST("/login", authHandler.Login)
-
-			// Password reset routes
-			fmt.Println("Registering route: /api/auth/reset-password")
 			auth.POST("/reset-password", authHandler.RequestPasswordReset)
-
-			fmt.Println("Registering route: /api/auth/reset-password/confirm")
 			auth.POST("/reset-password/confirm", authHandler.ResetPassword)
-
-			fmt.Println("Registering route: /api/auth/validate")
 			auth.GET("/validate", authHandler.ValidateToken)
-			fmt.Println("Registering route: /api/auth/validate-token")
-
-			// Email verification routes
-			fmt.Println("Registering route: /api/auth/verify-email")
 			auth.GET("/verify-email", authHandler.VerifyEmail)
 			auth.POST("/verify-email", middleware.AuthMiddleware(cfg.JWTSecret), authHandler.ResendVerificationEmail)
 			auth.GET("/token-info", authHandler.GetResetTokenInfo)
-			fmt.Println("Registering route: /api/auth/logout")
-			auth.POST("/logout", func(c *gin.Context) {
-				// Clear the auth cookie by setting it to expire immediately
-				c.SetCookie(
-					"authToken", // Cookie name
-					"",          // Empty value
-					-1,          // Max age (-1 = delete now)
-					"/",         // Path
-					"",          // Domain
-					false,       // Secure
-					true,        // HTTP only
-				)
 
+			auth.POST("/logout", func(c *gin.Context) {
+				var token string
+				cookieToken, err := c.Cookie("authToken")
+				if err == nil {
+					token = cookieToken
+				} else {
+					authHeader := c.GetHeader("Authorization")
+					if strings.HasPrefix(authHeader, "Bearer ") {
+						token = strings.TrimPrefix(authHeader, "Bearer ")
+					}
+				}
+
+				if token != "" {
+					// FIXED: Use the db parameter passed to SetupRoutes (which is *gorm.DB)
+					result := db.Where("session_token = ?", token).Delete(&models.Session{})
+					if result.Error != nil {
+						fmt.Printf("[LOGOUT] Error deleting session: %v\n", result.Error)
+					} else {
+						fmt.Printf("[LOGOUT] Deleted %d sessions\n", result.RowsAffected)
+					}
+				}
+
+				c.SetCookie("authToken", "", -1, "/", "", false, true)
 				c.JSON(http.StatusOK, gin.H{
 					"success": true,
 					"message": "Logged out successfully",
@@ -278,79 +274,39 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		pdf.Use(middleware.ApiKeyMiddleware(keyValidationService))
 		{
 			pdf.GET("/cleanup", cleanupHandler.Cleanup)
-			fmt.Println("Registering route: /api/pdf/compress")
 			pdf.POST("/compress", pdfHandler.CompressPDF)
-
-			fmt.Println("Registering route: /api/pdf/convert")
 			pdf.POST("/convert", pdfHandler.ConvertPDF)
-
-			fmt.Println("Registering route: /api/pdf/protect")
 			pdf.POST("/protect", pdfHandler.ProtectPDF)
-
-			fmt.Println("Registering route: /api/pdf/merge")
 			pdf.POST("/merge", pdfHandler.MergePDFs)
-
-			fmt.Println("Registering route: /api/pdf/split")
-			pdf.POST("/sign", signPdfHandler.SignPDF)
-			// New routes
-			fmt.Println("Registering route: /api/pdf/split")
 			pdf.POST("/split", pdfHandler.SplitPDF)
-
-			fmt.Println("Registering route: /api/pdf/split/status")
 			pdf.GET("/split/status", pdfHandler.GetSplitStatus)
-
-			fmt.Println("Registering route: /api/pdf/rotate")
 			pdf.POST("/rotate", pdfHandler.RotatePDF)
-
-			fmt.Println("Registering route: /api/pdf/pagenumber")
 			pdf.POST("/pagenumber", pdfHandler.AddPageNumbersToPDF)
-
-			fmt.Println("Registering route: /api/pdf/remove")
 			pdf.POST("/remove", pdfHandler.RemovePagesFromPDF)
-
-			fmt.Println("Registering route: /api/pdf/watermark")
 			pdf.POST("/watermark", pdfHandler.WatermarkPDF)
-
-			fmt.Println("Registering route: /api/pdf/unlock")
 			pdf.POST("/unlock", pdfHandler.UnlockPDF)
-
-			fmt.Println("Registering route: /api/pdf/extract-text")
+			pdf.POST("/sign", signPdfHandler.SignPDF)
 			pdf.POST("/extract-text", pdfTextEditorHandler.ExtractTextToPDF)
-
-			fmt.Println("Registering route: /api/pdf/save-edited-text")
 			pdf.POST("/save-edited-text", pdfTextEditorHandler.SaveEditedPDF)
-
-			fmt.Println("Registering route: /api/pdf/edit-session")
 			pdf.GET("/edit-session", pdfTextEditorHandler.GetEditSession)
 		}
 
-		// User routes
 		user := api.Group("/user")
 		user.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		{
-			fmt.Println("Registering route: /api/user/balance")
 			user.GET("/balance", balanceHandler.GetBalance)
-
-			fmt.Println("Registering route: /api/user/deposit")
 			user.POST("/deposit", balanceHandler.CreateDeposit)
-
-			fmt.Println("Registering route: /api/user/deposit/verify")
 			user.POST("/deposit/verify", balanceHandler.VerifyDeposit)
-
-			// User profile routes
-			fmt.Println("Registering route: /api/user/profile")
 			user.GET("/profile", handlers.GetUserProfile)
 			user.PUT("/profile", handlers.UpdateUserProfile)
-
-			// Password change route
-			fmt.Println("Registering route: /api/user/password")
 			user.PUT("/password", handlers.ChangeUserPassword)
 		}
+
+		// Simplified admin routes without settings management
 		admin := api.Group("/admin")
 		admin.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		admin.Use(middleware.AdminMiddleware())
 		{
-
 			admin.GET("/dashboard", adminHandler.GetDashboardStats)
 			admin.GET("/users", adminHandler.GetUsers)
 			admin.GET("/users/:id", adminHandler.GetUser)
@@ -360,27 +316,48 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			admin.GET("/api-usage", adminHandler.GetAPIUsage)
 			admin.GET("/transactions", adminHandler.GetTransactions)
 			admin.GET("/activity", adminHandler.GetActivityLogs)
-			admin.POST("/settings", adminHandler.UpdateSettings)
+
+			// Keep pricing management (these use database, not env settings)
 			admin.GET("/pricing", adminHandler.GetPricingSettings)
 			admin.POST("/pricing", adminHandler.UpdatePricingSettings)
 			admin.POST("/operation-pricing", adminHandler.UpdateOperationPricing)
-			admin.GET("/settings/:category", settingsHandler.GetSettings)
-			admin.POST("/settings/:category", settingsHandler.UpdateSettings)
-			admin.GET("/settings", settingsHandler.GetAllSettings)
+
+			// Keep PDF tools management
 			admin.GET("/settings/pdf-tools", pdfToolsHandler.GetPDFTools)
 			admin.PATCH("/settings/pdf-tools/:id", pdfToolsHandler.UpdateToolStatus)
 			admin.POST("/settings/pdf-tools/enable-all", pdfToolsHandler.EnableAllTools)
 			admin.POST("/settings/pdf-tools/disable-all", pdfToolsHandler.DisableAllTools)
 			admin.GET("/settings/pdf-tools/categories", pdfToolsHandler.GetToolsByCategory)
+
+			// Environment configuration endpoint (read-only)
+			admin.GET("/config", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{
+					"success": true,
+					"config": gin.H{
+						"appUrl":      os.Getenv("APP_URL"),
+						"apiUrl":      os.Getenv("API_URL"),
+						"debug":       os.Getenv("DEBUG") == "true",
+						"emailFrom":   os.Getenv("EMAIL_FROM"),
+						"smtpHost":    os.Getenv("SMTP_HOST"),
+						"smtpPort":    func() int { port, _ := strconv.Atoi(os.Getenv("SMTP_PORT")); return port }(),
+						"dbHost":      os.Getenv("DB_HOST"),
+						"dbPort":      func() int { port, _ := strconv.Atoi(os.Getenv("DB_PORT")); return port }(),
+						"dbName":      os.Getenv("DB_NAME"),
+						"dbUser":      os.Getenv("DB_USER"),
+						"hasSmtpAuth": os.Getenv("SMTP_USER") != "",
+						"hasPaypal":   os.Getenv("PAYPAL_CLIENT_ID") != "",
+						"hasGoogle":   os.Getenv("GOOGLE_CLIENT_ID") != "",
+					},
+					"message": "Configuration loaded from environment variables",
+				})
+			})
 		}
+
 		keys := api.Group("/keys")
 		keys.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		{
-			fmt.Println("Registering route: /api/keys")
 			keys.GET("", apiKeyHandler.ListKeys)
 			keys.POST("", apiKeyHandler.CreateKey)
-
-			fmt.Println("Registering route: /api/keys/:id")
 			keys.DELETE("/:id", apiKeyHandler.RevokeKey)
 		}
 	}
@@ -401,9 +378,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	// Health check endpoint
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"status": "ok",
+			"status":        "ok",
+			"config_source": "environment_variables",
 		})
 	})
 
-	fmt.Println("Routes setup complete")
+	fmt.Println("Simplified routes setup complete - using environment variables only")
 }
