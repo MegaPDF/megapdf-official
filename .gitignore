@@ -8,6 +8,7 @@
 .yarn/install-state.gz
 # Environment Variables
 /api/public
+/api/backups
 /api/uploads
 /api/.env
 /app/.env
