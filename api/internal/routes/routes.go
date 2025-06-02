@@ -1,4 +1,4 @@
-// internal/routes/routes.go - Simplified without database settings
+// internal/routes/routes.go - Updated with environment management
 package routes
 
 import (
@@ -78,7 +78,7 @@ func maskPassword(password string) string {
 }
 
 func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
-	fmt.Println("Setting up simplified routes with environment variables...")
+	fmt.Println("Setting up routes with environment variable management...")
 
 	// Log configuration (from environment variables)
 	fmt.Println("Configuration loaded from environment variables:")
@@ -140,6 +140,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	fileHandler := handlers.NewFileHandler(cfg)
 	adminHandler := handlers.NewAdminHandler()
 	paypalWebhookHandler := handlers.NewPayPalWebhookHandler()
+	envFileHandler := handlers.NewEnvFileHandler()
 
 	fmt.Println("Setting email service on auth handler")
 	authHandler.SetEmailService(emailService)
@@ -252,7 +253,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 				}
 
 				if token != "" {
-					// FIXED: Use the db parameter passed to SetupRoutes (which is *gorm.DB)
 					result := db.Where("session_token = ?", token).Delete(&models.Session{})
 					if result.Error != nil {
 						fmt.Printf("[LOGOUT] Error deleting session: %v\n", result.Error)
@@ -302,7 +302,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			user.PUT("/password", handlers.ChangeUserPassword)
 		}
 
-		// Simplified admin routes without settings management
+		// Admin routes - now includes environment management
 		admin := api.Group("/admin")
 		admin.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		admin.Use(middleware.AdminMiddleware())
@@ -329,7 +329,20 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			admin.POST("/settings/pdf-tools/disable-all", pdfToolsHandler.DisableAllTools)
 			admin.GET("/settings/pdf-tools/categories", pdfToolsHandler.GetToolsByCategory)
 
-			// Environment configuration endpoint (read-only)
+			// NEW: Environment variable management routes
+			env := admin.Group("/environment")
+			{
+				env.GET("/status", envFileHandler.GetEnvironmentStatus)       // ← Make sure these GET routes exist
+				env.GET("/variables", envFileHandler.GetEnvironmentVariables) // ← Make sure these GET routes exist
+				env.PUT("/variables", envFileHandler.UpdateEnvironmentVariables)
+				env.POST("/validate", envFileHandler.ValidateEnvironmentVariables)
+				env.GET("/file", envFileHandler.GetEnvironmentFileContent) // ← Make sure these GET routes exist
+				env.POST("/create", envFileHandler.CreateEnvironmentFile)
+				env.GET("/backups", envFileHandler.GetBackupFiles) // ← Make sure these GET routes exist
+				env.POST("/restore/:backup", envFileHandler.RestoreFromBackup)
+			}
+
+			// Environment configuration endpoint (read-only overview)
 			admin.GET("/config", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{
 					"success": true,
@@ -383,5 +396,5 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		})
 	})
 
-	fmt.Println("Simplified routes setup complete - using environment variables only")
+	fmt.Println("Routes setup complete - including environment variable management")
 }

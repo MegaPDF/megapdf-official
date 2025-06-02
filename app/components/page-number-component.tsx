@@ -118,12 +118,12 @@ export function PdfPageNumberer() {
       xhr.open("POST", apiUrl);
 
       // Add API key if available
-      const apiKey =
-        localStorage.getItem("apiKey") ||
-        "sk_d6c1daa54dbc95956b281fa02c544e7273ed10df60b211fe";
-      if (apiKey) {
-        xhr.setRequestHeader("x-api-key", apiKey);
-      }
+      // const apiKey =
+      //   localStorage.getItem("apiKey") ||
+      //   "sk_d6c1daa54dbc95956b281fa02c544e7273ed10df60b211fe";
+      // if (apiKey) {
+      //   xhr.setRequestHeader("x-api-key", apiKey);
+      // }
 
       // Track upload progress
       xhr.upload.onprogress = (event) => {

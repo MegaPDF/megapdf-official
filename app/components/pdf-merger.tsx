@@ -163,10 +163,10 @@ export function PdfMerger() {
 
         const xhr = new XMLHttpRequest();
         xhr.open("POST", apiUrl);
-        xhr.setRequestHeader(
-          "x-api-key",
-          "sk_d6c1daa54dbc95956b281fa02c544e7273ed10df60b211fe"
-        );
+        // xhr.setRequestHeader(
+        //   "x-api-key",
+        //   "sk_d6c1daa54dbc95956b281fa02c544e7273ed10df60b211fe"
+        // );
 
         // Track upload progress
         xhr.upload.onprogress = (event) => {

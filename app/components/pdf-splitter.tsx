@@ -153,7 +153,7 @@ export function PdfSplitter() {
     return new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("GET", fullStatusUrl);
-      xhr.setRequestHeader("x-api-key", `${process.env.GO_KEY_PDF}`);
+      // xhr.setRequestHeader("x-api-key", `${process.env.GO_KEY_PDF}`);
 
       xhr.onload = function () {
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -309,10 +309,10 @@ export function PdfSplitter() {
       // Track upload progress
       const xhr = new XMLHttpRequest();
       xhr.open("POST", apiUrl);
-      xhr.setRequestHeader(
-        "x-api-key",
-        "sk_d6c1daa54dbc95956b281fa02c544e7273ed10df60b211fe"
-      );
+      // xhr.setRequestHeader(
+      //   "x-api-key",
+      //   "sk_d6c1daa54dbc95956b281fa02c544e7273ed10df60b211fe"
+      // );
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {

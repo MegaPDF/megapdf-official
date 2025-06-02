@@ -251,9 +251,9 @@ export function PdfRotator() {
 
       xhr.open("POST", url, true);
 
-      Object.keys(headers).forEach((key) => {
-        xhr.setRequestHeader(key, headers[key]);
-      });
+      // Object.keys(headers).forEach((key) => {
+      //   xhr.setRequestHeader(key, headers[key]);
+      // });
 
       signal.addEventListener("abort", () => {
         xhr.abort();

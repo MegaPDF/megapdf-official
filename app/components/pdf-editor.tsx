@@ -1194,8 +1194,8 @@ export function PdfTextEditor() {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", apiUrl);
 
-      const apiKey = "sk_d6c1daa54dbc95956b281fa02c544e7273ed10df60b211fe";
-      xhr.setRequestHeader("x-api-key", apiKey);
+      // const apiKey = "sk_d6c1daa54dbc95956b281fa02c544e7273ed10df60b211fe";
+      // xhr.setRequestHeader("x-api-key", apiKey);
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {

@@ -205,11 +205,11 @@ export function PdfOcrExtractor() {
         xhr.open("POST", apiUrl);
 
         // Add API key if available (for production)
-        xhr.setRequestHeader(
-          "x-api-key",
-          process.env.NEXT_PUBLIC_API_KEY ||
-            "sk_d6c1daa54dbc95956b281fa02c544e7273ed10df60b211fe"
-        );
+        // xhr.setRequestHeader(
+        //   "x-api-key",
+        //   process.env.NEXT_PUBLIC_API_KEY ||
+        //     "sk_d6c1daa54dbc95956b281fa02c544e7273ed10df60b211fe"
+        // );
 
         // Track upload progress
         xhr.upload.onprogress = (event) => {
