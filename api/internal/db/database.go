@@ -201,33 +201,33 @@ func InitDB() (*gorm.DB, error) {
 
 	// Auto-migrate all models
 	fmt.Println("Auto-migrating database schema...")
-	//err = db.AutoMigrate(
-	// 	&models.User{},
-	// 	&models.Transaction{},
-	// 	&models.Account{},
-	// 	&models.Session{},
-	// 	&models.ApiKey{},
-	// 	&models.UsageStats{},
-	// 	&models.PasswordResetToken{},
-	// 	&models.VerificationToken{},
-	// 	&models.PaymentWebhookEvent{},
-	// 	&models.LowBalanceAlert{},
-	// 	&models.OperationsAlert{},
-	// 	&models.PricingSetting{},
-	// 	&models.Setting{},
-	//&models.PDFToolSettings{},
-	//)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to auto-migrate database schema: %w", err)
-	// }
+	err = db.AutoMigrate(
+		&models.User{},
+		&models.Transaction{},
+		&models.Account{},
+		&models.Session{},
+		&models.ApiKey{},
+		&models.UsageStats{},
+		&models.PasswordResetToken{},
+		&models.VerificationToken{},
+		&models.PaymentWebhookEvent{},
+		&models.LowBalanceAlert{},
+		&models.OperationsAlert{},
+		&models.PricingSetting{},
+		&models.Setting{},
+		&models.PDFToolSettings{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to auto-migrate database schema: %w", err)
+	}
 
 	// Create admin user if it doesn't exist
 	if err := createAdminUser(db); err != nil {
 		return nil, fmt.Errorf("failed to create admin user: %w", err)
 	}
-	// if err := initializePDFToolsSettings(db); err != nil {
-	// 	return nil, fmt.Errorf("failed to initialize PDF tool settings: %w", err)
-	// }
+	if err := initializePDFToolsSettings(db); err != nil {
+		return nil, fmt.Errorf("failed to initialize PDF tool settings: %w", err)
+	}
 	// Initialize default settings
 	if err := initializeDefaultSettings(db); err != nil {
 		return nil, fmt.Errorf("failed to initialize default settings: %w", err)
