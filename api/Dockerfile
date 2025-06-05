@@ -90,6 +90,8 @@ RUN mkdir -p /app/public/conversions \
     /app/public/redacted \
     /app/public/repaired \
     /app/public/signatures \
+    /app/public/invoices \
+    /app/public/templates \
     /app/public/status
 
 # Make the binary executable

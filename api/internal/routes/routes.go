@@ -144,7 +144,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	fmt.Println("Setting email service on auth handler")
 	authHandler.SetEmailService(emailService)
-
+	invoiceHandler := handlers.NewInvoiceHandler(balanceService, cfg)
 	pdfToolsHandler := handlers.NewPDFToolsHandler()
 	ocrHandler := handlers.NewOcrHandler(balanceService, cfg)
 	toolStatusHandler := handlers.NewToolStatusHandler()
@@ -289,6 +289,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			pdf.POST("/extract-text", pdfTextEditorHandler.ExtractTextToPDF)
 			pdf.POST("/save-edited-text", pdfTextEditorHandler.SaveEditedPDF)
 			pdf.GET("/edit-session", pdfTextEditorHandler.GetEditSession)
+			pdf.POST("/generate-invoice", invoiceHandler.GenerateInvoice)
+			pdf.GET("/invoice-templates", invoiceHandler.GetInvoiceTemplates)
+			pdf.POST("/create-invoice-template", invoiceHandler.CreateInvoiceTemplate)
 		}
 
 		user := api.Group("/user")
