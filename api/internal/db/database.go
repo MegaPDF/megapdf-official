@@ -1,4 +1,3 @@
-// internal/db/database.go
 package db
 
 import (
@@ -88,6 +87,8 @@ func createIndexes(db *gorm.DB) error {
 	})
 }
 
+// initializeAdminSettings has been moved to avoid import cycle with repository package.
+
 // InitDB initializes the SQLite database connection
 func InitDB() (*gorm.DB, error) {
 	// Get database path from environment variables
@@ -147,6 +148,7 @@ func InitDB() (*gorm.DB, error) {
 		&models.OperationsAlert{},
 		&models.PricingSetting{},
 		&models.PDFToolSettings{},
+		&models.AdminSettings{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to auto-migrate database schema: %w", err)

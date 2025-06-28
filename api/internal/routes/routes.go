@@ -73,7 +73,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	r.StaticFile("/favicon.ico", "./static/images/favicon.ico")
 
 	// Load HTML templates with proper pattern
-	r.LoadHTMLGlob("templates/**/*.html")
+	r.LoadHTMLGlob("templates/**/*")
 	fmt.Println("Running in", mode, "mode")
 
 	// Initialize services
@@ -91,7 +91,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	apiKeyHandler := handlers.NewApiKeyHandler(apiKeyService)
 	fileHandler := handlers.NewFileHandler(cfg)
 	paypalWebhookHandler := handlers.NewPayPalWebhookHandler()
-
+	adminHandler := handlers.NewAdminHandler(cfg, db)
 	fmt.Println("Setting email service on auth handler")
 	authHandler.SetEmailService(emailService)
 	invoiceHandler := handlers.NewInvoiceHandler(balanceService, cfg)
@@ -253,7 +253,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			user.PUT("/password", handlers.ChangeUserPassword)
 		}
 
-		
 		keys := api.Group("/keys")
 		keys.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		{
@@ -261,8 +260,43 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			keys.POST("", apiKeyHandler.CreateKey)
 			keys.DELETE("/:id", apiKeyHandler.RevokeKey)
 		}
-	}
+		admin := api.Group("/admin")
+		admin.Use(middleware.AdminMiddleware(cfg.JWTSecret))
+		{
+			// Dashboard
+			admin.GET("/dashboard", adminHandler.GetDashboard)
 
+			// Settings Management
+			admin.GET("/settings", adminHandler.GetSettings)
+			admin.PUT("/settings", adminHandler.UpdateSettings)
+
+			// Configuration
+			admin.GET("/config/app", adminHandler.GetAppConfig)
+			admin.GET("/config/paypal", adminHandler.GetPayPalConfig)
+			admin.GET("/config/smtp", adminHandler.GetSMTPConfig)
+			admin.GET("/config/security", adminHandler.GetSecurityConfig)
+
+			// User Management
+			admin.GET("/users", adminHandler.GetUsers)
+			admin.GET("/users/:id", adminHandler.GetUser)
+			admin.PUT("/users/:id", adminHandler.UpdateUser)
+			admin.DELETE("/users/:id", adminHandler.DeleteUser)
+
+			// PDF Tools Management
+			admin.GET("/tools", adminHandler.GetPDFTools)
+			admin.PUT("/tools/:id", adminHandler.UpdateToolStatus)
+			admin.POST("/tools/enable-all", adminHandler.EnableAllTools)
+			admin.POST("/tools/disable-all", adminHandler.DisableAllTools)
+
+			// Pricing Management
+			admin.GET("/pricing", adminHandler.GetPricing)
+			admin.PUT("/pricing", adminHandler.UpdatePricing)
+		}
+
+	}
+	// Admin Panel Static Route (outside API group)
+	r.GET("/admin", adminHandler.ServeAdminPanel)
+	r.Static("/admin-assets", "./admin-panel/assets")
 	// Add email preview route in development mode
 	if cfg.Debug {
 		r.GET("/email-preview", func(c *gin.Context) {

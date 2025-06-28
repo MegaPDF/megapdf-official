@@ -1,4 +1,3 @@
-// cmd/api/main.go - Updated with Settings Integration
 package main
 
 import (

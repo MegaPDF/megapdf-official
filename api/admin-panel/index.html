@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MegaPDF Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="assets/css/admin.css" rel="stylesheet">
+    <script>
+        // API Configuration - Update this to match your API URL
+        window.API_BASE_URL = window.location.protocol + '//' + window.location.host;
+    </script>
+</head>
+<body class="bg-gray-50">
+    <div id="admin-app">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-8 rounded-lg shadow-lg text-center max-w-sm mx-4">
+                <div class="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-file-pdf text-white text-2xl"></i>
+                </div>
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-gray-600">Loading admin panel...</p>
+            </div>
+        </div>
+
+        <!-- Login Form (initially hidden) -->
+        <div id="login-form" class="hidden min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-purple-600 to-blue-800 py-12 px-4 sm:px-6 lg:px-8">
+            <div class="max-w-md w-full space-y-8">
+                <div class="text-center">
+                    <div class="mx-auto w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4">
+                        <i class="fas fa-file-pdf text-blue-600 text-2xl"></i>
+                    </div>
+                    <h2 class="text-3xl font-extrabold text-white">
+                        MegaPDF Admin Panel
+                    </h2>
+                    <p class="mt-2 text-sm text-blue-100">
+                        Please sign in to access the admin panel
+                    </p>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-xl p-8">
+                    <form class="space-y-6" id="admin-login-form">
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email address</label>
+                            <input id="email" name="email" type="email" required 
+                                   class="relative block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" 
+                                   placeholder="admin@megapdf.com">
+                        </div>
+                        <div>
+                            <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                            <input id="password" name="password" type="password" required 
+                                   class="relative block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" 
+                                   placeholder="Password">
+                        </div>
+                        <div>
+                            <button type="submit" 
+                                    class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                                <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                                    <i class="fas fa-lock text-blue-500 group-hover:text-blue-400"></i>
+                                </span>
+                                Sign in
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <!-- Default Credentials Info -->
+                    <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-start">
+                            <i class="fas fa-info-circle text-blue-500 mr-2 mt-0.5"></i>
+                            <div>
+                                <h4 class="text-sm font-medium text-blue-800">Default Admin Credentials</h4>
+                                <p class="text-sm text-blue-700 mt-1">
+                                    Email: <code class="bg-blue-100 px-1 rounded">admin@megapdf.com</code><br>
+                                    Password: <code class="bg-blue-100 px-1 rounded">password</code>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="login-error" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Panel (initially hidden) -->
+        <div id="admin-panel" class="hidden">
+            <!-- Sidebar -->
+            <div class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transform transition-transform duration-300 ease-in-out lg:translate-x-0 -translate-x-full" id="sidebar">
+                <div class="flex items-center justify-center h-16 bg-gray-800">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded flex items-center justify-center mr-3">
+                            <i class="fas fa-file-pdf text-white text-sm"></i>
+                        </div>
+                        <h1 class="text-white text-xl font-bold">MegaPDF Admin</h1>
+                    </div>
+                </div>
+                <nav class="mt-5 px-2">
+                    <a href="#" data-page="dashboard" class="nav-item group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                        <i class="fas fa-tachometer-alt mr-4"></i>
+                        Dashboard
+                    </a>
+                    <a href="#" data-page="users" class="nav-item group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                        <i class="fas fa-users mr-4"></i>
+                        Users
+                    </a>
+                    <a href="#" data-page="settings" class="nav-item group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                        <i class="fas fa-cog mr-4"></i>
+                        Settings
+                    </a>
+                    <a href="#" data-page="pricing" class="nav-item group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                        <i class="fas fa-dollar-sign mr-4"></i>
+                        Pricing
+                    </a>
+                    <a href="#" data-page="tools" class="nav-item group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                        <i class="fas fa-tools mr-4"></i>
+                        PDF Tools
+                    </a>
+                    
+                    <!-- Spacer -->
+                    <div class="mt-8 pt-4 border-t border-gray-700">
+                        <a href="#" id="logout-btn" class="group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200">
+                            <i class="fas fa-sign-out-alt mr-4"></i>
+                            Logout
+                        </a>
+                    </div>
+                </nav>
+            </div>
+
+            <!-- Main Content -->
+            <div class="lg:pl-64 flex flex-col flex-1">
+                <!-- Top Bar -->
+                <div class="sticky top-0 z-10 bg-white shadow">
+                    <div class="flex items-center justify-between h-16 px-4">
+                        <button id="sidebar-toggle" class="lg:hidden text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                            <i class="fas fa-bars text-xl"></i>
+                        </button>
+                        <div class="flex items-center space-x-4">
+                            <div class="hidden md:flex items-center text-sm text-gray-500">
+                                <i class="fas fa-clock mr-2"></i>
+                                <span id="current-time"></span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center mr-3">
+                                    <i class="fas fa-user text-gray-600 text-sm"></i>
+                                </div>
+                                <span class="text-gray-700 font-medium">Admin User</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Page Content -->
+                <main class="flex-1 p-6">
+                    <div id="page-content">
+                        <!-- Dynamic content will be loaded here -->
+                    </div>
+                </main>
+            </div>
+
+            <!-- Mobile sidebar overlay -->
+            <div id="sidebar-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-40 lg:hidden hidden"></div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <!-- Scripts -->
+    <script src="assets/js/utils/helpers.js"></script>
+    <script src="assets/js/utils/notifications.js"></script>
+    <script src="assets/js/utils/validation.js"></script>
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/components/charts.js"></script>
+    <script src="assets/js/components/dashboard.js"></script>
+    <script src="assets/js/components/users.js"></script>
+    <script src="assets/js/components/settings.js"></script>
+    <script src="assets/js/components/pricing.js"></script>
+    <script src="assets/js/components/tools.js"></script>
+    <script src="assets/js/admin.js"></script>
+
+    <script>
+        // Initialize current time display
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            const timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                timeElement.textContent = timeString;
+            }
+        }
+
+        // Update time every minute
+        setInterval(updateTime, 60000);
+        updateTime();
+
+        // Enhanced sidebar functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+            function openSidebar() {
+                sidebar.classList.remove('-translate-x-full');
+                sidebarOverlay.classList.remove('hidden');
+            }
+
+            function closeSidebar() {
+                sidebar.classList.add('-translate-x-full');
+                sidebarOverlay.classList.add('hidden');
+            }
+
+            // Toggle sidebar on mobile
+            sidebarToggle?.addEventListener('click', () => {
+                if (sidebar.classList.contains('-translate-x-full')) {
+                    openSidebar();
+                } else {
+                    closeSidebar();
+                }
+            });
+
+            // Close sidebar when clicking overlay
+            sidebarOverlay?.addEventListener('click', closeSidebar);
+
+            // Close sidebar on window resize to desktop
+            window.addEventListener('resize', () => {
+                if (window.innerWidth >= 1024) {
+                    sidebarOverlay.classList.add('hidden');
+                }
+            });
+
+            // Close sidebar when clicking nav items on mobile
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    if (window.innerWidth < 1024) {
+                        closeSidebar();
+                    }
+                });
+            });
+        });
+
+        // Handle escape key to close sidebar
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const sidebar = document.getElementById('sidebar');
+                const sidebarOverlay = document.getElementById('sidebar-overlay');
+                if (!sidebar.classList.contains('-translate-x-full')) {
+                    sidebar.classList.add('-translate-x-full');
+                    sidebarOverlay.classList.add('hidden');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
