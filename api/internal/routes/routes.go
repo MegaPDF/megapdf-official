@@ -82,7 +82,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	apiKeyService := services.NewApiKeyService(db)
 	emailService := services.NewEmailService(cfg)
 	pdfHandler := handlers.NewPDFHandler(balanceService, cfg)
-
+	adminDashboardHandler := handlers.NewAdminDashboardHandler(cfg)
 	// Initialize handlers
 	keyValidationHandler := handlers.NewKeyValidationHandler(keyValidationService)
 	balanceHandler := handlers.NewBalanceHandler(balanceService)
@@ -325,7 +325,26 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	// Swagger documentation
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+	adminPages := r.Group("/admin")
+	{
+		// Public login page
+		adminPages.GET("/login", adminDashboardHandler.AdminLoginPage)
 
+		// Protected admin pages (require admin authentication)
+		adminPages.GET("/dashboard", middleware.AuthMiddleware(cfg.JWTSecret), middleware.AdminMiddleware(), adminDashboardHandler.AdminDashboardPage)
+		adminPages.GET("/users", middleware.AuthMiddleware(cfg.JWTSecret), middleware.AdminMiddleware(), adminDashboardHandler.AdminUsersPage)
+		adminPages.GET("/settings", middleware.AuthMiddleware(cfg.JWTSecret), middleware.AdminMiddleware(), adminDashboardHandler.AdminSettingsPage)
+		adminPages.GET("/transactions", middleware.AuthMiddleware(cfg.JWTSecret), middleware.AdminMiddleware(), adminDashboardHandler.AdminTransactionsPage)
+		adminPages.GET("/api-docs", middleware.AuthMiddleware(cfg.JWTSecret), middleware.AdminMiddleware(), adminDashboardHandler.AdminAPIDocsPage)
+
+		// Redirect root admin to dashboard
+		adminPages.GET("/", func(c *gin.Context) {
+			c.Redirect(http.StatusTemporaryRedirect, "/admin/dashboard")
+		})
+		adminPages.GET("", func(c *gin.Context) {
+			c.Redirect(http.StatusTemporaryRedirect, "/admin/dashboard")
+		})
+	}
 	// Health check endpoint
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
