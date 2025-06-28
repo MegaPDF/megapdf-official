@@ -4,10 +4,8 @@ package routes
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -71,8 +69,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		})
 	}
 
-	r.LoadHTMLGlob("templates/*")
-	fmt.Println("Loaded HTML templates from api/templates/")
+	r.Static("/static", "./static")
+	r.StaticFile("/favicon.ico", "./static/images/favicon.ico")
+
+	// Load HTML templates with proper pattern
+	r.LoadHTMLGlob("templates/**/*.html")
 	fmt.Println("Running in", mode, "mode")
 
 	// Initialize services
@@ -82,7 +83,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	apiKeyService := services.NewApiKeyService(db)
 	emailService := services.NewEmailService(cfg)
 	pdfHandler := handlers.NewPDFHandler(balanceService, cfg)
-	adminDashboardHandler := handlers.NewAdminDashboardHandler(cfg)
 	// Initialize handlers
 	keyValidationHandler := handlers.NewKeyValidationHandler(keyValidationService)
 	balanceHandler := handlers.NewBalanceHandler(balanceService)
@@ -90,7 +90,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	trackUsageHandler := handlers.NewTrackUsageHandler()
 	apiKeyHandler := handlers.NewApiKeyHandler(apiKeyService)
 	fileHandler := handlers.NewFileHandler(cfg)
-	adminHandler := handlers.NewAdminHandler()
 	paypalWebhookHandler := handlers.NewPayPalWebhookHandler()
 
 	fmt.Println("Setting email service on auth handler")
@@ -175,7 +174,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		api.POST("/track-usage", middleware.AuthMiddleware(cfg.JWTSecret), trackUsageHandler.TrackOperation)
 		api.POST("/ocr", middleware.ApiKeyMiddleware(keyValidationService), ocrHandler.OcrPdf)
 		api.POST("/ocr/extract", middleware.ApiKeyMiddleware(keyValidationService), ocrHandler.ExtractText)
-		api.GET("/pricing", adminHandler.GetPricingSettings)
 
 		auth := api.Group("/auth")
 		{
@@ -255,97 +253,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			user.PUT("/password", handlers.ChangeUserPassword)
 		}
 
-		// Admin routes - now includes environment management
-
-		admin := api.Group("/admin")
-		admin.Use(middleware.AuthMiddleware(cfg.JWTSecret))
-		admin.Use(middleware.AdminMiddleware())
-		{
-
-			admin.GET("/debug/settings", func(c *gin.Context) {
-				// Test direct database query
-				var settings []models.AppSetting
-				var count int64
-
-				// Count settings
-				if err := db.Model(&models.AppSetting{}).Count(&count).Error; err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{
-						"error": "Failed to count settings: " + err.Error(),
-					})
-					return
-				}
-
-				// Get first 5 settings
-				if err := db.Limit(5).Find(&settings).Error; err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{
-						"error": "Failed to get settings: " + err.Error(),
-					})
-					return
-				}
-
-				c.JSON(http.StatusOK, gin.H{
-					"success":         true,
-					"total_settings":  count,
-					"sample_settings": settings,
-					"database_path":   db.Migrator().CurrentDatabase(),
-				})
-			})
-
-			// Also add this simple test endpoint
-			admin.GET("/test", func(c *gin.Context) {
-				c.JSON(http.StatusOK, gin.H{
-					"success":   true,
-					"message":   "Admin API is working",
-					"timestamp": time.Now(),
-				})
-			})
-			// Your existing admin routes...
-			admin.GET("/dashboard", adminHandler.GetDashboardStats)
-			admin.GET("/users", adminHandler.GetUsers)
-			admin.GET("/users/:id", adminHandler.GetUser)
-			admin.POST("/users", adminHandler.CreateUser)
-			admin.PATCH("/users/:id", adminHandler.UpdateUser)
-			admin.DELETE("/users/:id", adminHandler.DeleteUser)
-			admin.GET("/api-usage", adminHandler.GetAPIUsage)
-			admin.GET("/transactions", adminHandler.GetTransactions)
-			admin.GET("/activity", adminHandler.GetActivityLogs)
-
-			// Keep pricing management (these use database, not env settings)
-			admin.GET("/pricing", adminHandler.GetPricingSettings)
-			admin.POST("/pricing", adminHandler.UpdatePricingSettings)
-			admin.POST("/operation-pricing", adminHandler.UpdateOperationPricing)
-
-			// ADD THESE NEW SETTINGS ROUTES:
-			admin.GET("/settings", adminHandler.GetAllSettings)
-			admin.GET("/settings/:category", adminHandler.GetSettingsByCategory)
-			admin.GET("/settings/key/:key", adminHandler.GetSetting)
-			admin.PUT("/settings", adminHandler.UpdateSettings)
-			admin.PUT("/settings/key/:key", adminHandler.UpdateSetting)
-			admin.DELETE("/settings/key/:key/reset", adminHandler.ResetSetting)
-			admin.GET("/settings/key/:key/history", adminHandler.GetSettingHistory)
-			admin.GET("/settings/export", adminHandler.ExportSettings)
-			admin.POST("/settings/import", adminHandler.ImportSettings)
-
-			// Environment configuration endpoint (read-only overview)
-			admin.GET("/config", func(c *gin.Context) {
-				c.JSON(http.StatusOK, gin.H{
-					"success": true,
-					"config": gin.H{
-						"appUrl":      os.Getenv("APP_URL"),
-						"apiUrl":      os.Getenv("API_URL"),
-						"debug":       os.Getenv("DEBUG") == "true",
-						"emailFrom":   os.Getenv("EMAIL_FROM"),
-						"smtpHost":    os.Getenv("SMTP_HOST"),
-						"smtpPort":    func() int { port, _ := strconv.Atoi(os.Getenv("SMTP_PORT")); return port }(),
-						"hasSmtpAuth": os.Getenv("SMTP_USER") != "",
-						"hasPaypal":   os.Getenv("PAYPAL_CLIENT_ID") != "",
-						"hasGoogle":   os.Getenv("GOOGLE_CLIENT_ID") != "",
-					},
-					"message": "Configuration loaded from environment variables",
-				})
-			})
-		}
-
+		
 		keys := api.Group("/keys")
 		keys.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		{
@@ -367,26 +275,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	// Swagger documentation
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
-	adminPages := r.Group("/admin")
-	{
-		// Public login page
-		adminPages.GET("/login", adminDashboardHandler.AdminLoginPage)
 
-		// Protected admin pages (require admin authentication)
-		adminPages.GET("/dashboard", middleware.AuthMiddleware(cfg.JWTSecret), middleware.AdminMiddleware(), adminDashboardHandler.AdminDashboardPage)
-		adminPages.GET("/users", middleware.AuthMiddleware(cfg.JWTSecret), middleware.AdminMiddleware(), adminDashboardHandler.AdminUsersPage)
-		adminPages.GET("/settings", middleware.AuthMiddleware(cfg.JWTSecret), middleware.AdminMiddleware(), adminDashboardHandler.AdminSettingsPage)
-		adminPages.GET("/transactions", middleware.AuthMiddleware(cfg.JWTSecret), middleware.AdminMiddleware(), adminDashboardHandler.AdminTransactionsPage)
-		adminPages.GET("/api-docs", middleware.AuthMiddleware(cfg.JWTSecret), middleware.AdminMiddleware(), adminDashboardHandler.AdminAPIDocsPage)
-
-		// Redirect root admin to dashboard
-		adminPages.GET("/", func(c *gin.Context) {
-			c.Redirect(http.StatusTemporaryRedirect, "/admin/dashboard")
-		})
-		adminPages.GET("", func(c *gin.Context) {
-			c.Redirect(http.StatusTemporaryRedirect, "/admin/dashboard")
-		})
-	}
 	// Health check endpoint
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{

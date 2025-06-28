@@ -39,14 +39,6 @@ func main() {
 	}
 	fmt.Println("SQLite database connected successfully")
 
-	// Initialize default settings if they don't exist
-	fmt.Println("Initializing application settings...")
-	if err := db.InitializeSettings(database); err != nil {
-		log.Printf("Warning: Failed to initialize default settings: %v", err)
-	} else {
-		fmt.Println("Application settings initialized successfully")
-	}
-
 	// Load configuration from .env file and environment variables
 	fmt.Println("Loading configuration...")
 	cfg := config.LoadConfig()
@@ -88,6 +80,9 @@ func main() {
 	// Create gin router
 	r := gin.Default()
 
+	if err != nil {
+		log.Fatalf("Failed to get underlying sql.DB: %v", err)
+	}
 	// Set up routes with current configuration
 	fmt.Println("Setting up routes...")
 	routes.SetupRoutes(r, database, cfg)
@@ -177,5 +172,4 @@ func printRoutes(r *gin.Engine) {
 	fmt.Printf("Settings API:    GET    /api/admin/settings\n")
 	fmt.Printf("Settings API:    PUT    /api/admin/settings\n")
 	fmt.Printf("API Docs:        GET    /swagger/index.html\n")
-	fmt.Println("===============================\n")
 }
