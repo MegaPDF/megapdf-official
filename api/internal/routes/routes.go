@@ -69,13 +69,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		})
 	}
 
-	r.Static("/static", "./static")
-	r.StaticFile("/favicon.ico", "./static/images/favicon.ico")
-
+	r.Static("/admin-assets", "./templates/assets")
 	// Load HTML templates with proper pattern
 	r.LoadHTMLGlob("templates/**/*")
 	fmt.Println("Running in", mode, "mode")
-
+	fmt.Println("Templates loaded from: api/templates/**/*")
 	// Initialize services
 	keyValidationService := services.NewKeyValidationService(db)
 	balanceService := services.NewBalanceService(db)
@@ -295,8 +293,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	}
 	// Admin Panel Static Route (outside API group)
-	r.GET("/admin", adminHandler.ServeAdminPanel)
-	r.Static("/admin-assets", "./admin-panel/assets")
+	r.GET("/admin", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/admin/index.html")
+	})
 	// Add email preview route in development mode
 	if cfg.Debug {
 		r.GET("/email-preview", func(c *gin.Context) {
