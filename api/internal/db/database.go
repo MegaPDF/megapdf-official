@@ -57,9 +57,6 @@ func createIndexes(db *gorm.DB) error {
 				"email",
 				"expires",
 			},
-			"settings": {
-				"category",
-			},
 		}
 
 		// Create single column indexes (SQLite compatible syntax)
@@ -134,14 +131,7 @@ func InitDB() (*gorm.DB, error) {
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	// Create indexes
-	if err := createIndexes(db); err != nil {
-		// Log the error but don't fail initialization
-		fmt.Printf("WARNING: Some database indexes could not be created: %v\n", err)
-		fmt.Println("The application will continue, but some queries may be slower than optimal")
-	}
-
-	// Auto-migrate all models
+	// IMPORTANT: Auto-migrate FIRST to create tables
 	fmt.Println("Auto-migrating database schema...")
 	err = db.AutoMigrate(
 		&models.User{},
@@ -156,11 +146,18 @@ func InitDB() (*gorm.DB, error) {
 		&models.LowBalanceAlert{},
 		&models.OperationsAlert{},
 		&models.PricingSetting{},
-		&models.Setting{},
 		&models.PDFToolSettings{},
+		// NOTE: Removed &models.Setting{} since we're not using database settings anymore
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to auto-migrate database schema: %w", err)
+	}
+
+	// THEN create indexes (after tables exist)
+	if err := createIndexes(db); err != nil {
+		// Log the error but don't fail initialization
+		fmt.Printf("WARNING: Some database indexes could not be created: %v\n", err)
+		fmt.Println("The application will continue, but some queries may be slower than optimal")
 	}
 
 	// Create admin user if it doesn't exist
@@ -171,11 +168,6 @@ func InitDB() (*gorm.DB, error) {
 	// Initialize PDF tools settings
 	if err := initializePDFToolsSettings(db); err != nil {
 		return nil, fmt.Errorf("failed to initialize PDF tool settings: %w", err)
-	}
-
-	// Initialize default settings
-	if err := initializeDefaultSettings(db); err != nil {
-		return nil, fmt.Errorf("failed to initialize default settings: %w", err)
 	}
 
 	// Initialize default pricing
@@ -189,7 +181,6 @@ func InitDB() (*gorm.DB, error) {
 	return db, nil
 }
 
-// Rest of your existing functions remain the same...
 func initializePDFToolsSettings(db *gorm.DB) error {
 	// Check if settings already exist
 	var count int64
@@ -270,19 +261,50 @@ func createAdminUser(db *gorm.DB) error {
 		return err
 	}
 
-	fmt.Printf("Created default admin user with ID: %s\n", adminID)
-	return nil
-}
-
-// Add other initialization functions here...
-func initializeDefaultSettings(db *gorm.DB) error {
-	// Implementation for default settings
-	// This would be similar to your existing implementation
+	fmt.Printf("Created default admin user - Email: admin@megapdf.com, Password: password\n")
+	fmt.Printf("Admin user ID: %s\n", adminID)
 	return nil
 }
 
 func initializeDefaultPricing(db *gorm.DB) error {
-	// Implementation for default pricing
-	// This would be similar to your existing implementation
+	// Check if pricing settings already exist
+	var count int64
+	if err := db.Model(&models.PricingSetting{}).Where("`key` = ?", "pricing_settings").Count(&count).Error; err != nil {
+		return err
+	}
+
+	if count > 0 {
+		fmt.Println("Pricing settings already exist, skipping initialization")
+		return nil
+	}
+
+	// Create default pricing configuration
+	defaultPricing := models.CustomPricing{
+		OperationCost:         0.001, // $0.001 per operation
+		FreeOperationsMonthly: 100,   // 100 free operations per month
+		CustomPrices:          make(map[string]float64),
+	}
+
+	// Marshal to JSON
+	pricingJSON, err := json.Marshal(defaultPricing)
+	if err != nil {
+		return fmt.Errorf("failed to marshal default pricing: %w", err)
+	}
+
+	// Create default pricing settings record
+	pricingSetting := models.PricingSetting{
+		ID:          uuid.New().String(),
+		Key:         "pricing_settings",
+		Value:       string(pricingJSON),
+		Description: "Default pricing settings for PDF operations",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	if err := db.Create(&pricingSetting).Error; err != nil {
+		return fmt.Errorf("failed to create default pricing settings: %w", err)
+	}
+
+	fmt.Println("Created default pricing settings")
 	return nil
 }

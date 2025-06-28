@@ -284,6 +284,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			admin.GET("/settings/pdf-tools/categories", pdfToolsHandler.GetToolsByCategory)
 
 			// Environment configuration endpoint (read-only overview)
+			// Keep this simple read-only endpoint
 			admin.GET("/config", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{
 					"success": true,
@@ -294,10 +295,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 						"emailFrom":   os.Getenv("EMAIL_FROM"),
 						"smtpHost":    os.Getenv("SMTP_HOST"),
 						"smtpPort":    func() int { port, _ := strconv.Atoi(os.Getenv("SMTP_PORT")); return port }(),
-						"dbHost":      os.Getenv("DB_HOST"),
-						"dbPort":      func() int { port, _ := strconv.Atoi(os.Getenv("DB_PORT")); return port }(),
-						"dbName":      os.Getenv("DB_NAME"),
-						"dbUser":      os.Getenv("DB_USER"),
 						"hasSmtpAuth": os.Getenv("SMTP_USER") != "",
 						"hasPaypal":   os.Getenv("PAYPAL_CLIENT_ID") != "",
 						"hasGoogle":   os.Getenv("GOOGLE_CLIENT_ID") != "",
