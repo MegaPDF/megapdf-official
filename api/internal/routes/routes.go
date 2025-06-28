@@ -96,7 +96,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	fmt.Println("Setting email service on auth handler")
 	authHandler.SetEmailService(emailService)
 	invoiceHandler := handlers.NewInvoiceHandler(balanceService, cfg)
-	pdfToolsHandler := handlers.NewPDFToolsHandler()
 	ocrHandler := handlers.NewOcrHandler(balanceService, cfg)
 	toolStatusHandler := handlers.NewToolStatusHandler()
 	pdfTextEditorHandler := handlers.NewPDFTextEditorHandler(balanceService, cfg)
@@ -257,10 +256,50 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		}
 
 		// Admin routes - now includes environment management
+
 		admin := api.Group("/admin")
 		admin.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		admin.Use(middleware.AdminMiddleware())
 		{
+
+			admin.GET("/debug/settings", func(c *gin.Context) {
+				// Test direct database query
+				var settings []models.AppSetting
+				var count int64
+
+				// Count settings
+				if err := db.Model(&models.AppSetting{}).Count(&count).Error; err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{
+						"error": "Failed to count settings: " + err.Error(),
+					})
+					return
+				}
+
+				// Get first 5 settings
+				if err := db.Limit(5).Find(&settings).Error; err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{
+						"error": "Failed to get settings: " + err.Error(),
+					})
+					return
+				}
+
+				c.JSON(http.StatusOK, gin.H{
+					"success":         true,
+					"total_settings":  count,
+					"sample_settings": settings,
+					"database_path":   db.Migrator().CurrentDatabase(),
+				})
+			})
+
+			// Also add this simple test endpoint
+			admin.GET("/test", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{
+					"success":   true,
+					"message":   "Admin API is working",
+					"timestamp": time.Now(),
+				})
+			})
+			// Your existing admin routes...
 			admin.GET("/dashboard", adminHandler.GetDashboardStats)
 			admin.GET("/users", adminHandler.GetUsers)
 			admin.GET("/users/:id", adminHandler.GetUser)
@@ -276,15 +315,18 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			admin.POST("/pricing", adminHandler.UpdatePricingSettings)
 			admin.POST("/operation-pricing", adminHandler.UpdateOperationPricing)
 
-			// Keep PDF tools management
-			admin.GET("/settings/pdf-tools", pdfToolsHandler.GetPDFTools)
-			admin.PATCH("/settings/pdf-tools/:id", pdfToolsHandler.UpdateToolStatus)
-			admin.POST("/settings/pdf-tools/enable-all", pdfToolsHandler.EnableAllTools)
-			admin.POST("/settings/pdf-tools/disable-all", pdfToolsHandler.DisableAllTools)
-			admin.GET("/settings/pdf-tools/categories", pdfToolsHandler.GetToolsByCategory)
+			// ADD THESE NEW SETTINGS ROUTES:
+			admin.GET("/settings", adminHandler.GetAllSettings)
+			admin.GET("/settings/:category", adminHandler.GetSettingsByCategory)
+			admin.GET("/settings/key/:key", adminHandler.GetSetting)
+			admin.PUT("/settings", adminHandler.UpdateSettings)
+			admin.PUT("/settings/key/:key", adminHandler.UpdateSetting)
+			admin.DELETE("/settings/key/:key/reset", adminHandler.ResetSetting)
+			admin.GET("/settings/key/:key/history", adminHandler.GetSettingHistory)
+			admin.GET("/settings/export", adminHandler.ExportSettings)
+			admin.POST("/settings/import", adminHandler.ImportSettings)
 
 			// Environment configuration endpoint (read-only overview)
-			// Keep this simple read-only endpoint
 			admin.GET("/config", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{
 					"success": true,

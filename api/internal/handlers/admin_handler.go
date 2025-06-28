@@ -4,6 +4,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/MegaPDF/megapdf-official/api/internal/repository"
 	"github.com/MegaPDF/megapdf-official/api/internal/services"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type AdminHandler struct{}
@@ -1200,29 +1202,6 @@ func (h *AdminHandler) GetActivityLogs(c *gin.Context) {
 	})
 }
 
-// UpdateSettings updates system settings
-func (h *AdminHandler) UpdateSettings(c *gin.Context) {
-	// Parse settings from request
-	var req struct {
-		Settings map[string]interface{} `json:"settings" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// In a real application, you would store these settings in the database
-	// For demonstration, we'll just acknowledge receipt
-	c.JSON(http.StatusOK, gin.H{
-		"success":  true,
-		"message":  "Settings updated successfully",
-		"settings": req.Settings,
-	})
-}
-
-// Add this function to internal/handlers/admin_handler.go
-// GetPricingSettings returns the current pricing settings
 func (h *AdminHandler) GetPricingSettings(c *gin.Context) {
 	// Get pricing settings from database
 	pricingRepo := repository.NewPricingRepository()
@@ -1429,4 +1408,724 @@ func DebugPricingSettings() {
 	} else {
 		fmt.Printf("ADMIN PRICING ERROR: Failed to get raw JSON: %v\n", err)
 	}
+}
+
+// GetAllSettings returns all application settings grouped by category
+func (h *AdminHandler) GetAllSettings(c *gin.Context) {
+	var settings []models.AppSetting
+
+	// Get all settings ordered by category, group, and order
+	if err := db.DB.Order("category, `group`, `order`, key").Find(&settings).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to retrieve settings",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Group settings by category
+	categorizedSettings := make(map[string][]models.AppSetting)
+
+	// Hide secret values and organize by category
+	for i := range settings {
+		if settings[i].IsSecret && settings[i].Value != "" {
+			settings[i].Value = "***HIDDEN***"
+		}
+
+		category := settings[i].Category
+		if categorizedSettings[category] == nil {
+			categorizedSettings[category] = []models.AppSetting{}
+		}
+		categorizedSettings[category] = append(categorizedSettings[category], settings[i])
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":              true,
+		"settings":             settings,
+		"categorized_settings": categorizedSettings,
+		"total_count":          len(settings),
+	})
+}
+
+// GetSettingsByCategory returns settings for a specific category
+func (h *AdminHandler) GetSettingsByCategory(c *gin.Context) {
+	category := c.Param("category")
+	if category == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Category parameter is required",
+		})
+		return
+	}
+
+	var settings []models.AppSetting
+	if err := db.DB.Where("category = ?", category).Order("`group`, `order`, key").Find(&settings).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to retrieve settings for category",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Hide secret values
+	for i := range settings {
+		if settings[i].IsSecret && settings[i].Value != "" {
+			settings[i].Value = "***HIDDEN***"
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":  true,
+		"category": category,
+		"settings": settings,
+		"count":    len(settings),
+	})
+}
+
+// GetSetting returns a single setting
+func (h *AdminHandler) GetSetting(c *gin.Context) {
+	key := c.Param("key")
+	if key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Key parameter is required",
+		})
+		return
+	}
+
+	var setting models.AppSetting
+	if err := db.DB.Where("`key` = ?", key).First(&setting).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "Setting not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to retrieve setting",
+				"details": err.Error(),
+			})
+		}
+		return
+	}
+
+	// Hide secret value
+	if setting.IsSecret && setting.Value != "" {
+		setting.Value = "***HIDDEN***"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"setting": setting,
+	})
+}
+
+// UpdateSettings updates multiple settings at once
+func (h *AdminHandler) UpdateSettings(c *gin.Context) {
+	var request map[string]interface{}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Get user ID for audit trail
+	userID, _ := c.Get("userID")
+	userIDStr := ""
+	if userID != nil {
+		userIDStr = userID.(string)
+	}
+
+	// Start transaction
+	tx := db.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	updatedSettings := []models.AppSetting{}
+	historyEntries := []models.SettingHistory{}
+
+	// Process each setting update
+	for key, value := range request {
+		var setting models.AppSetting
+		if err := tx.Where("`key` = ?", key).First(&setting).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Setting '" + key + "' not found",
+			})
+			return
+		}
+
+		// Check if setting is read-only
+		if setting.IsReadOnly {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Setting '" + key + "' is read-only",
+			})
+			return
+		}
+
+		// Store old value for history
+		oldValue := setting.Value
+
+		// Validate and set new value
+		if err := setting.SetValue(value); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Invalid value for setting '" + key + "'",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		// Additional validation based on setting rules
+		if err := h.validateSettingValue(&setting, value); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Validation failed for setting '" + key + "'",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		setting.UpdatedBy = userIDStr
+
+		// Save setting
+		if err := tx.Save(&setting).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to update setting '" + key + "'",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		updatedSettings = append(updatedSettings, setting)
+
+		// Create history entry if value changed
+		if oldValue != setting.Value {
+			history := models.SettingHistory{
+				SettingID: setting.ID,
+				OldValue:  oldValue,
+				NewValue:  setting.Value,
+				ChangedBy: userIDStr,
+				Reason:    "Admin panel update",
+			}
+			historyEntries = append(historyEntries, history)
+		}
+	}
+
+	// Save history entries
+	for _, history := range historyEntries {
+		if err := tx.Create(&history).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to save change history",
+				"details": err.Error(),
+			})
+			return
+		}
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to save settings",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":          true,
+		"message":          "Settings updated successfully",
+		"updated_count":    len(updatedSettings),
+		"updated_settings": updatedSettings,
+	})
+}
+
+// UpdateSetting updates a single setting
+func (h *AdminHandler) UpdateSetting(c *gin.Context) {
+	key := c.Param("key")
+	if key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Key parameter is required",
+		})
+		return
+	}
+
+	var request struct {
+		Value  interface{} `json:"value" binding:"required"`
+		Reason string      `json:"reason"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Get user ID for audit trail
+	userID, _ := c.Get("userID")
+	userIDStr := ""
+	if userID != nil {
+		userIDStr = userID.(string)
+	}
+
+	var setting models.AppSetting
+	if err := db.DB.Where("`key` = ?", key).First(&setting).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "Setting not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to retrieve setting",
+				"details": err.Error(),
+			})
+		}
+		return
+	}
+
+	// Check if setting is read-only
+	if setting.IsReadOnly {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Setting is read-only",
+		})
+		return
+	}
+
+	// Store old value for history
+	oldValue := setting.Value
+
+	// Validate and set new value
+	if err := setting.SetValue(request.Value); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid value format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Additional validation
+	if err := h.validateSettingValue(&setting, request.Value); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Validation failed",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	setting.UpdatedBy = userIDStr
+
+	// Start transaction
+	tx := db.DB.Begin()
+
+	// Save setting
+	if err := tx.Save(&setting).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to update setting",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Create history entry if value changed
+	if oldValue != setting.Value {
+		history := models.SettingHistory{
+			SettingID: setting.ID,
+			OldValue:  oldValue,
+			NewValue:  setting.Value,
+			ChangedBy: userIDStr,
+			Reason:    request.Reason,
+		}
+
+		if err := tx.Create(&history).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to save change history",
+				"details": err.Error(),
+			})
+			return
+		}
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to save setting",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Setting updated successfully",
+		"setting": setting,
+	})
+}
+
+// ResetSetting resets a setting to its default value
+func (h *AdminHandler) ResetSetting(c *gin.Context) {
+	key := c.Param("key")
+	if key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Key parameter is required",
+		})
+		return
+	}
+
+	// Get user ID for audit trail
+	userID, _ := c.Get("userID")
+	userIDStr := ""
+	if userID != nil {
+		userIDStr = userID.(string)
+	}
+
+	var setting models.AppSetting
+	if err := db.DB.Where("`key` = ?", key).First(&setting).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "Setting not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to retrieve setting",
+				"details": err.Error(),
+			})
+		}
+		return
+	}
+
+	// Check if setting is read-only
+	if setting.IsReadOnly {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Setting is read-only",
+		})
+		return
+	}
+
+	// Store old value for history
+	oldValue := setting.Value
+
+	// Reset to default value
+	setting.Value = setting.DefaultValue
+	setting.UpdatedBy = userIDStr
+
+	// Start transaction
+	tx := db.DB.Begin()
+
+	// Save setting
+	if err := tx.Save(&setting).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to reset setting",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Create history entry
+	history := models.SettingHistory{
+		SettingID: setting.ID,
+		OldValue:  oldValue,
+		NewValue:  setting.Value,
+		ChangedBy: userIDStr,
+		Reason:    "Reset to default value",
+	}
+
+	if err := tx.Create(&history).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to save change history",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to reset setting",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Setting reset to default value",
+		"setting": setting,
+	})
+}
+
+// GetSettingHistory returns change history for a setting
+func (h *AdminHandler) GetSettingHistory(c *gin.Context) {
+	key := c.Param("key")
+	if key == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Key parameter is required",
+		})
+		return
+	}
+
+	// Get setting
+	var setting models.AppSetting
+	if err := db.DB.Where("`key` = ?", key).First(&setting).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "Setting not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to retrieve setting",
+				"details": err.Error(),
+			})
+		}
+		return
+	}
+
+	// Get history
+	var history []models.SettingHistory
+	if err := db.DB.Where("setting_id = ?", setting.ID).Order("created_at DESC").Find(&history).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to retrieve setting history",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"setting": setting,
+		"history": history,
+		"count":   len(history),
+	})
+}
+
+// ExportSettings exports all settings as JSON
+func (h *AdminHandler) ExportSettings(c *gin.Context) {
+	var settings []models.AppSetting
+	if err := db.DB.Order("category, key").Find(&settings).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to retrieve settings",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Don't export secret values
+	for i := range settings {
+		if settings[i].IsSecret {
+			settings[i].Value = ""
+		}
+	}
+
+	exportData := map[string]interface{}{
+		"exported_at": time.Now(),
+		"version":     "1.0",
+		"settings":    settings,
+	}
+
+	c.Header("Content-Disposition", "attachment; filename=settings-export.json")
+	c.JSON(http.StatusOK, exportData)
+}
+
+// ImportSettings imports settings from JSON
+func (h *AdminHandler) ImportSettings(c *gin.Context) {
+	var request struct {
+		Settings  []models.AppSetting `json:"settings" binding:"required"`
+		Overwrite bool                `json:"overwrite"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Get user ID for audit trail
+	userID, _ := c.Get("userID")
+	userIDStr := ""
+	if userID != nil {
+		userIDStr = userID.(string)
+	}
+
+	// Start transaction
+	tx := db.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	importedCount := 0
+	skippedCount := 0
+
+	for _, importSetting := range request.Settings {
+		var existingSetting models.AppSetting
+		exists := tx.Where("`key` = ?", importSetting.Key).First(&existingSetting).Error == nil
+
+		if exists && !request.Overwrite {
+			skippedCount++
+			continue
+		}
+
+		if exists {
+			// Update existing setting
+			existingSetting.Value = importSetting.Value
+			existingSetting.Description = importSetting.Description
+			existingSetting.UpdatedBy = userIDStr
+
+			if err := tx.Save(&existingSetting).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"success": false,
+					"error":   "Failed to update setting: " + importSetting.Key,
+					"details": err.Error(),
+				})
+				return
+			}
+		} else {
+			// Create new setting
+			importSetting.ID = ""
+			importSetting.CreatedBy = userIDStr
+			importSetting.UpdatedBy = userIDStr
+
+			if err := tx.Create(&importSetting).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"success": false,
+					"error":   "Failed to create setting: " + importSetting.Key,
+					"details": err.Error(),
+				})
+				return
+			}
+		}
+
+		importedCount++
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to import settings",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":        true,
+		"message":        "Settings imported successfully",
+		"imported_count": importedCount,
+		"skipped_count":  skippedCount,
+	})
+}
+
+// Helper function to validate setting values
+func (h *AdminHandler) validateSettingValue(setting *models.AppSetting, value interface{}) error {
+	rules := setting.GetValidationRules()
+	if rules == nil {
+		return nil
+	}
+
+	// Implement validation logic based on rules
+	if minLen, exists := rules["min_length"]; exists {
+		if str, ok := value.(string); ok {
+			if len(str) < int(minLen.(float64)) {
+				return fmt.Errorf("value must be at least %v characters", minLen)
+			}
+		}
+	}
+
+	if maxLen, exists := rules["max_length"]; exists {
+		if str, ok := value.(string); ok {
+			if len(str) > int(maxLen.(float64)) {
+				return fmt.Errorf("value must be at most %v characters", maxLen)
+			}
+		}
+	}
+
+	if pattern, exists := rules["pattern"]; exists {
+		if str, ok := value.(string); ok {
+			matched, _ := regexp.MatchString(pattern.(string), str)
+			if !matched {
+				return fmt.Errorf("value does not match required pattern")
+			}
+		}
+	}
+
+	if min, exists := rules["min"]; exists {
+		switch v := value.(type) {
+		case int:
+			if float64(v) < min.(float64) {
+				return fmt.Errorf("value must be at least %v", min)
+			}
+		case float64:
+			if v < min.(float64) {
+				return fmt.Errorf("value must be at least %v", min)
+			}
+		}
+	}
+
+	if max, exists := rules["max"]; exists {
+		switch v := value.(type) {
+		case int:
+			if float64(v) > max.(float64) {
+				return fmt.Errorf("value must be at most %v", max)
+			}
+		case float64:
+			if v > max.(float64) {
+				return fmt.Errorf("value must be at most %v", max)
+			}
+		}
+	}
+
+	return nil
 }

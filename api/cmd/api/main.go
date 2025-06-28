@@ -1,10 +1,11 @@
-// cmd/api/main.go - Updated to use SQLite
+// cmd/api/main.go - Updated with Settings Integration
 package main
 
 import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/MegaPDF/megapdf-official/api/docs"
 	"github.com/MegaPDF/megapdf-official/api/internal/config"
@@ -30,6 +31,22 @@ import (
 func main() {
 	fmt.Println("=== MegaPDF API Server ===")
 
+	// Initialize SQLite database FIRST (before loading config)
+	fmt.Println("Initializing SQLite database connection...")
+	database, err := db.InitDB()
+	if err != nil {
+		log.Fatalf("Failed to initialize SQLite database: %v", err)
+	}
+	fmt.Println("SQLite database connected successfully")
+
+	// Initialize default settings if they don't exist
+	fmt.Println("Initializing application settings...")
+	if err := db.InitializeSettings(database); err != nil {
+		log.Printf("Warning: Failed to initialize default settings: %v", err)
+	} else {
+		fmt.Println("Application settings initialized successfully")
+	}
+
 	// Load configuration from .env file and environment variables
 	fmt.Println("Loading configuration...")
 	cfg := config.LoadConfig()
@@ -53,18 +70,13 @@ func main() {
 		fmt.Println("Running in debug mode")
 	}
 
-	// Initialize SQLite database
-	fmt.Println("Initializing SQLite database connection...")
-	database, err := db.InitDB()
-	if err != nil {
-		log.Fatalf("Failed to initialize SQLite database: %v", err)
-	}
-	fmt.Println("SQLite database connected successfully")
-
 	// Verify database file exists and log its location
-	dbPath := os.Getenv("SQLITE_PATH")
+	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
-		dbPath = "data/megapdf.db"
+		dbPath = os.Getenv("SQLITE_PATH")
+		if dbPath == "" {
+			dbPath = "data/megapdf.db"
+		}
 	}
 
 	if _, err := os.Stat(dbPath); err == nil {
@@ -86,10 +98,21 @@ func main() {
 	// Create necessary directories (including data directory for SQLite)
 	createDirectories(cfg)
 
+	// Optional: Migrate environment variables to database settings
+	// Uncomment the following lines if you want to migrate .env values to database
+	/*
+		fmt.Println("Checking for environment variable migration...")
+		if err := db.MigrateEnvToSettings(database); err != nil {
+			log.Printf("Warning: Failed to migrate environment variables: %v", err)
+		}
+	*/
+
 	// Start server
 	port := fmt.Sprintf(":%d", cfg.Port)
 	fmt.Printf("Starting server on port %d...\n", cfg.Port)
 	fmt.Printf("API documentation available at: http://localhost%s/swagger/index.html\n", port)
+	fmt.Printf("Admin dashboard available at: http://localhost%s/admin\n", port)
+	fmt.Println("Settings management available in admin dashboard -> Settings tab")
 
 	if err := r.Run(port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
@@ -98,11 +121,16 @@ func main() {
 
 // createDirectories creates necessary directories including data directory for SQLite
 func createDirectories(cfg *config.Config) {
+	fmt.Println("Creating necessary directories...")
+
 	directories := []string{
 		cfg.TempDir,
 		cfg.UploadDir,
 		cfg.PublicDir,
-		"data", // Add data directory for SQLite database
+		"data",    // SQLite database directory
+		"uploads", // Default uploads directory
+		"temp",    // Default temp directory
+		"logs",    // Logs directory (if you add logging later)
 	}
 
 	for _, dir := range directories {
@@ -114,15 +142,40 @@ func createDirectories(cfg *config.Config) {
 	}
 }
 
-// printRoutes prints all registered routes (existing function - no changes needed)
+// printRoutes prints all registered routes
 func printRoutes(r *gin.Engine) {
 	fmt.Println("\n=== Registered Routes ===")
 	routes := r.Routes()
 
+	// Group routes by prefix for better readability
+	routeGroups := make(map[string][]gin.RouteInfo)
+
 	for _, route := range routes {
-		fmt.Printf("%-8s %s\n", route.Method, route.Path)
+		prefix := "/"
+		if len(route.Path) > 1 {
+			parts := strings.Split(route.Path[1:], "/")
+			if len(parts) > 0 {
+				prefix = "/" + parts[0]
+			}
+		}
+		routeGroups[prefix] = append(routeGroups[prefix], route)
+	}
+
+	// Print routes grouped by prefix
+	for prefix, groupRoutes := range routeGroups {
+		fmt.Printf("\n%s:\n", prefix)
+		for _, route := range groupRoutes {
+			fmt.Printf("  %-8s %s\n", route.Method, route.Path)
+		}
 	}
 
 	fmt.Printf("\nTotal routes: %d\n", len(routes))
-	fmt.Println("========================\n")
+
+	// Show important endpoints
+	fmt.Println("\n=== Important Endpoints ===")
+	fmt.Printf("Admin Dashboard: GET    /admin\n")
+	fmt.Printf("Settings API:    GET    /api/admin/settings\n")
+	fmt.Printf("Settings API:    PUT    /api/admin/settings\n")
+	fmt.Printf("API Docs:        GET    /swagger/index.html\n")
+	fmt.Println("===============================\n")
 }

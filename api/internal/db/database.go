@@ -147,7 +147,8 @@ func InitDB() (*gorm.DB, error) {
 		&models.OperationsAlert{},
 		&models.PricingSetting{},
 		&models.PDFToolSettings{},
-		// NOTE: Removed &models.Setting{} since we're not using database settings anymore
+		&models.AppSetting{},     // Add this line
+		&models.SettingHistory{}, // Add this line
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to auto-migrate database schema: %w", err)
@@ -174,7 +175,9 @@ func InitDB() (*gorm.DB, error) {
 	if err := initializeDefaultPricing(db); err != nil {
 		return nil, fmt.Errorf("failed to initialize default pricing: %w", err)
 	}
-
+	if err := InitializeSettings(db); err != nil {
+		return nil, fmt.Errorf("failed to initialize settings: %w", err)
+	}
 	// Store DB in package variable for global access
 	DB = db
 	fmt.Println("SQLite database initialized successfully!")
