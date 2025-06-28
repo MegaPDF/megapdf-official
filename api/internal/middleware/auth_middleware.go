@@ -19,7 +19,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Skip authentication for certain endpoints
 		skipPaths := []string{
-			"/api/auth/validate",
+			"/api/validate-token",
 			"/api/auth/reset-password",
 			"/api/auth/login",
 			"/api/auth/register",

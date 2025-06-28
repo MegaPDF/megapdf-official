@@ -77,7 +77,7 @@ class AdminAPI {
 
     async validateToken() {
         try {
-            const response = await this.request('/api/auth/validate');
+            const response = await this.request('/api/validate-token');
             return response && response.valid;
         } catch (error) {
             return false;

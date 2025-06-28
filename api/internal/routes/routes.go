@@ -71,7 +71,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	r.Static("/admin-assets", "./templates/assets")
 	// Load HTML templates with proper pattern
-	r.LoadHTMLGlob("templates/**/*")
+	r.LoadHTMLGlob("templates/*.html")
 	fmt.Println("Running in", mode, "mode")
 	fmt.Println("Templates loaded from: api/templates/**/*")
 	// Initialize services
@@ -293,9 +293,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	}
 	// Admin Panel Static Route (outside API group)
-	r.GET("/admin", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/admin/index.html")
-	})
+	r.GET("/admin/index.html", adminHandler.ServeAdminPanel)
 	// Add email preview route in development mode
 	if cfg.Debug {
 		r.GET("/email-preview", func(c *gin.Context) {

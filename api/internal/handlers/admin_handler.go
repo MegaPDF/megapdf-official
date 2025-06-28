@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -37,12 +38,33 @@ func NewAdminHandler(cfg *config.Config, db *gorm.DB) *AdminHandler {
 // @Failure 500 {object} object{error=string}
 // @Router /api/admin/dashboard [get]
 func (h *AdminHandler) GetDashboard(c *gin.Context) {
+	fmt.Println("=== DEBUG: Dashboard endpoint called ===")
+
+	// Check if user is in context
+	userID, exists := c.Get("userID")
+	if !exists {
+		fmt.Println("ERROR: No userID in context")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	fmt.Printf("User ID from context: %s\n", userID)
+
+	userRole, exists := c.Get("userRole")
+	if !exists {
+		fmt.Println("ERROR: No userRole in context")
+	} else {
+		fmt.Printf("User role from context: %s\n", userRole)
+	}
+
+	fmt.Println("Calling adminService.GetDashboardData()...")
 	dashboardData, err := h.adminService.GetDashboardData()
 	if err != nil {
+		fmt.Printf("ERROR: Dashboard data failed: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	fmt.Println("Dashboard data retrieved successfully")
 	c.JSON(http.StatusOK, dashboardData)
 }
 
@@ -467,7 +489,7 @@ func (h *AdminHandler) UpdatePricing(c *gin.Context) {
 // @Success 200 {string} string "HTML content"
 // @Router /admin [get]
 func (h *AdminHandler) ServeAdminPanel(c *gin.Context) {
-	c.HTML(http.StatusOK, "admin/index.html", gin.H{
+	c.HTML(http.StatusOK, "index.html", gin.H{ // ✅ Correct path
 		"title":  "MegaPDF Admin Panel",
 		"apiUrl": h.config.APIUrl,
 	})
