@@ -4,6 +4,7 @@ package repository
 import (
 	"fmt"
 
+	"github.com/MegaPDF/megapdf-official/api/internal/config"
 	"github.com/MegaPDF/megapdf-official/api/internal/db"
 	"github.com/MegaPDF/megapdf-official/api/internal/models"
 )
@@ -21,9 +22,9 @@ func NewConfigRepository() *ConfigRepository {
 }
 
 // LoadConfig loads all configuration from the database
-func (r *ConfigRepository) LoadConfig() (*Config, error) {
+func (r *ConfigRepository) LoadConfig() (config.Config, error) {
 	// Start with default configuration
-	config := &Config{
+	config := &config.Config{
 		Port:                     8080,
 		JWTSecret:                "default-jwt-secret",
 		TempDir:                  "temp",
@@ -36,25 +37,13 @@ func (r *ConfigRepository) LoadConfig() (*Config, error) {
 		APIUrl:                   "http://localhost:8080",
 		Debug:                    false,
 		OAuthRedirectURL:         "http://localhost:8080/api/auth/google/callback",
-		DBHost:                   "localhost",
-		DBPort:                   3306,
-		DBName:                   "megapdf",
-		DBUser:                   "root",
-		DBCharset:                "utf8mb4",
-		DBCollation:              "utf8mb4_unicode_ci",
-		DBTimezone:               "UTC",
-		DBMaxIdleConns:           10,
-		DBMaxOpenConns:           100,
-		DBConnMaxLifetime:        "1h",
 		RateLimitRequests:        100,
-		RateLimitPeriod:          60,
 		PasswordMinLength:        8,
 		PasswordRequireUppercase: true,
 		PasswordRequireNumbers:   true,
 		PasswordRequireSymbols:   false,
 		SessionTimeout:           24,
 		MaxLoginAttempts:         5,
-		CORSAllowedOrigins:       "*",
 	}
 
 	// Load settings from database
@@ -63,7 +52,6 @@ func (r *ConfigRepository) LoadConfig() (*Config, error) {
 	emailSettings, _ := r.settingsRepo.GetSettingsByCategory("email")
 	paymentSettings, _ := r.settingsRepo.GetSettingsByCategory("payment")
 	apiSettings, _ := r.settingsRepo.GetSettingsByCategory("api")
-	dbSettings, _ := r.settingsRepo.GetSettingsByCategory("database")
 	oauthSettings, _ := r.settingsRepo.GetSettingsByCategory("oauth")
 
 	// Apply general settings
@@ -119,9 +107,6 @@ func (r *ConfigRepository) LoadConfig() (*Config, error) {
 		}
 		if v, ok := securitySettings["maxLoginAttempts"].(float64); ok {
 			config.MaxLoginAttempts = int(v)
-		}
-		if v, ok := securitySettings["corsAllowedOrigins"].(string); ok {
-			config.CORSAllowedOrigins = v
 		}
 	}
 
@@ -189,29 +174,6 @@ func (r *ConfigRepository) LoadConfig() (*Config, error) {
 	}
 
 	// Apply database settings
-	if dbSettings != nil {
-		if v, ok := dbSettings["dbHost"].(string); ok {
-			config.DBHost = v
-		}
-		if v, ok := dbSettings["dbPort"].(float64); ok {
-			config.DBPort = int(v)
-		}
-		if v, ok := dbSettings["dbName"].(string); ok {
-			config.DBName = v
-		}
-		if v, ok := dbSettings["dbUser"].(string); ok {
-			config.DBUser = v
-		}
-		if v, ok := dbSettings["dbPassword"].(string); ok {
-			config.DBPassword = v
-		}
-		if v, ok := dbSettings["dbMaxIdleConns"].(float64); ok {
-			config.DBMaxIdleConns = int(v)
-		}
-		if v, ok := dbSettings["dbMaxOpenConns"].(float64); ok {
-			config.DBMaxOpenConns = int(v)
-		}
-	}
 
 	// Apply OAuth settings
 	if oauthSettings != nil {
@@ -226,11 +188,11 @@ func (r *ConfigRepository) LoadConfig() (*Config, error) {
 		}
 	}
 
-	return config, nil
+	return *config, nil
 }
 
 // SaveConfig saves configuration to the database
-func (r *ConfigRepository) SaveConfig(config *Config) error {
+func (r *ConfigRepository) SaveConfig(config *config.Config) error {
 	// Save general settings
 	generalSettings := map[string]interface{}{
 		"siteName":                 config.SiteName,
@@ -248,17 +210,10 @@ func (r *ConfigRepository) SaveConfig(config *Config) error {
 	}
 
 	// Save security settings
-	securitySettings := map[string]interface{}{
-		"jwtSecret":                config.JWTSecret,
-		"passwordMinLength":        config.PasswordMinLength,
-		"passwordRequireUppercase": config.PasswordRequireUppercase,
-		"passwordRequireNumbers":   config.PasswordRequireNumbers,
-		"passwordRequireSymbols":   config.PasswordRequireSymbols,
-		"sessionTimeout":           config.SessionTimeout,
-		"maxLoginAttempts":         config.MaxLoginAttempts,
-		"corsAllowedOrigins":       config.CORSAllowedOrigins,
+	dbSettings := map[string]interface{}{
+		"dbPath": config.DBPath, // Add this field to Config struct
 	}
-	if err := r.settingsRepo.SaveSettings("security", securitySettings, "Security settings"); err != nil {
+	if err := r.settingsRepo.SaveSettings("database", dbSettings, "Database settings"); err != nil {
 		return err
 	}
 
@@ -301,15 +256,7 @@ func (r *ConfigRepository) SaveConfig(config *Config) error {
 	}
 
 	// Save database settings
-	dbSettings := map[string]interface{}{
-		"dbHost":         config.DBHost,
-		"dbPort":         config.DBPort,
-		"dbName":         config.DBName,
-		"dbUser":         config.DBUser,
-		"dbPassword":     config.DBPassword,
-		"dbMaxIdleConns": config.DBMaxIdleConns,
-		"dbMaxOpenConns": config.DBMaxOpenConns,
-	}
+
 	if err := r.settingsRepo.SaveSettings("database", dbSettings, "Database settings"); err != nil {
 		return err
 	}
@@ -345,7 +292,7 @@ func (r *ConfigRepository) InitializeDefaultSettings() error {
 	}
 
 	// Create default config
-	config := &Config{
+	config := &config.Config{
 		SiteName:                 "MegaPDF",
 		SiteDescription:          "Professional PDF tools and API services",
 		MaintenanceMode:          false,
@@ -366,16 +313,7 @@ func (r *ConfigRepository) InitializeDefaultSettings() error {
 		APIUrl:                   "http://localhost:8080",
 		Debug:                    false,
 		OAuthRedirectURL:         "http://localhost:8080/api/auth/google/callback",
-		DBHost:                   "localhost",
-		DBPort:                   3306,
-		DBName:                   "megapdf",
-		DBUser:                   "root",
-		DBCharset:                "utf8mb4",
-		DBCollation:              "utf8mb4_unicode_ci",
-		DBTimezone:               "UTC",
-		DBMaxIdleConns:           10,
-		DBMaxOpenConns:           100,
-		DBConnMaxLifetime:        "1h",
+	
 		RateLimitRequests:        100,
 		APITimeout:               30,
 		LoggingEnabled:           true,
@@ -387,7 +325,6 @@ func (r *ConfigRepository) InitializeDefaultSettings() error {
 		PasswordRequireSymbols:   false,
 		SessionTimeout:           24,
 		MaxLoginAttempts:         5,
-		CORSAllowedOrigins:       "*",
 	}
 
 	// Save default config to database
@@ -399,79 +336,4 @@ func (r *ConfigRepository) countSettings() (int64, error) {
 	var count int64
 	err := db.DB.Model(&models.Setting{}).Count(&count).Error
 	return count, err
-}
-
-// Config holds all the application configuration
-type Config struct {
-	// General settings
-	SiteName                 string
-	SiteDescription          string
-	MaintenanceMode          bool
-	RegistrationEnabled      bool
-	RequireEmailVerification bool
-	Port                     int
-
-	// Paths
-	TempDir   string
-	UploadDir string
-	PublicDir string
-
-	// Payment
-	PayPalClientID     string
-	PayPalClientSecret string
-	PayPalAPIBase      string
-
-	// Email
-	EmailProvider    string
-	EmailFrom        string
-	EmailFromName    string
-	ContactRecipient string
-	SMTPHost         string
-	SMTPPort         int
-	SMTPUser         string
-	SMTPPass         string
-	SMTPSecure       bool
-
-	// URLs
-	AppURL string
-	APIUrl string
-
-	// Flags
-	Debug bool
-
-	// OAuth
-	GoogleClientID     string
-	GoogleClientSecret string
-	OAuthRedirectURL   string
-
-	// Database
-	DBHost            string
-	DBPort            int
-	DBName            string
-	DBUser            string
-	DBPassword        string
-	DBCharset         string
-	DBCollation       string
-	DBTimezone        string
-	DBMaxIdleConns    int
-	DBMaxOpenConns    int
-	DBConnMaxLifetime string
-
-	// API
-	RateLimitRequests int
-	RateLimitPeriod   int
-	APITimeout        int
-	LoggingEnabled    bool
-	LogLevel          string
-	MaxFileSize       int64
-
-	// Security
-	JWTSecret                string
-	PasswordMinLength        int
-	PasswordRequireUppercase bool
-	PasswordRequireNumbers   bool
-	PasswordRequireSymbols   bool
-	SessionTimeout           int
-	MaxLoginAttempts         int
-	CORSAllowedOrigins       string
 }

@@ -1,11 +1,10 @@
-// cmd/api/main.go - Updated to use .env file config system
+// cmd/api/main.go - Updated to use SQLite
 package main
 
 import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/MegaPDF/megapdf-official/api/docs"
 	"github.com/MegaPDF/megapdf-official/api/internal/config"
@@ -54,13 +53,25 @@ func main() {
 		fmt.Println("Running in debug mode")
 	}
 
-	// Initialize database
-	fmt.Println("Initializing database connection...")
+	// Initialize SQLite database
+	fmt.Println("Initializing SQLite database connection...")
 	database, err := db.InitDB()
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		log.Fatalf("Failed to initialize SQLite database: %v", err)
 	}
-	fmt.Println("Database connected successfully")
+	fmt.Println("SQLite database connected successfully")
+
+	// Verify database file exists and log its location
+	dbPath := os.Getenv("SQLITE_PATH")
+	if dbPath == "" {
+		dbPath = "data/megapdf.db"
+	}
+
+	if _, err := os.Stat(dbPath); err == nil {
+		fmt.Printf("SQLite database file: %s\n", dbPath)
+	} else {
+		log.Printf("Warning: SQLite database file not found at %s\n", dbPath)
+	}
 
 	// Create gin router
 	r := gin.Default()
@@ -72,170 +83,46 @@ func main() {
 	// Print registered routes
 	printRoutes(r)
 
-	// Create necessary directories
-	createDirs(cfg)
-
-	// Log final configuration status
-	logConfigurationStatus(cfg)
+	// Create necessary directories (including data directory for SQLite)
+	createDirectories(cfg)
 
 	// Start server
 	port := fmt.Sprintf(":%d", cfg.Port)
-	fmt.Printf("\n🚀 Starting MegaPDF API server on http://localhost%s\n", port)
-	fmt.Printf("📖 Swagger documentation: http://localhost%s/swagger/index.html\n", port)
-	fmt.Printf("⚙️  Admin environment settings: http://localhost:3001/admin/settings\n")
-	fmt.Println("========================================")
+	fmt.Printf("Starting server on port %d...\n", cfg.Port)
+	fmt.Printf("API documentation available at: http://localhost%s/swagger/index.html\n", port)
 
 	if err := r.Run(port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
 
-func printRoutes(r *gin.Engine) {
-	routes := r.Routes()
-	fmt.Println("\nRegistered Routes:")
-	fmt.Println("=================")
-
-	// Group routes by prefix for better readability
-	routeGroups := make(map[string][]string)
-	for _, route := range routes {
-		prefix := getRoutePrefix(route.Path)
-		routeGroups[prefix] = append(routeGroups[prefix], fmt.Sprintf("%s %s", route.Method, route.Path))
-	}
-
-	// Print grouped routes
-	for prefix, routes := range routeGroups {
-		fmt.Printf("\n%s:\n", prefix)
-		for _, route := range routes {
-			fmt.Printf("  %s\n", route)
-		}
-	}
-	fmt.Println("=================\n")
-}
-
-func getRoutePrefix(path string) string {
-	if path == "/" || path == "/health" {
-		return "System"
-	}
-	if path == "/swagger/*any" {
-		return "Documentation"
-	}
-	if len(path) > 4 && path[:4] == "/api" {
-		parts := strings.Split(path, "/")
-		if len(parts) >= 3 {
-			return fmt.Sprintf("API - %s", strings.Title(parts[2]))
-		}
-		return "API"
-	}
-	return "Other"
-}
-
-func createDirs(cfg *config.Config) {
-	fmt.Println("Creating necessary directories...")
-
-	dirs := []string{
+// createDirectories creates necessary directories including data directory for SQLite
+func createDirectories(cfg *config.Config) {
+	directories := []string{
 		cfg.TempDir,
 		cfg.UploadDir,
 		cfg.PublicDir,
-		cfg.PublicDir + "/conversions",
-		cfg.PublicDir + "/compressions",
-		cfg.PublicDir + "/merges",
-		cfg.PublicDir + "/splits",
-		cfg.PublicDir + "/rotations",
-		cfg.PublicDir + "/watermarked",
-		cfg.PublicDir + "/watermarks",
-		cfg.PublicDir + "/protected",
-		cfg.PublicDir + "/pagenumbers",
-		cfg.PublicDir + "/unlocked",
-		cfg.PublicDir + "/ocr",
-		cfg.PublicDir + "/edited",
-		cfg.PublicDir + "/processed",
-		cfg.PublicDir + "/unwatermarked",
-		cfg.PublicDir + "/redacted",
-		cfg.PublicDir + "/repaired",
-		cfg.PublicDir + "/signatures",
-		"backups", // For .env file backups
+		"data", // Add data directory for SQLite database
 	}
 
-	created := 0
-	for _, dir := range dirs {
+	for _, dir := range directories {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			log.Printf("Warning: Failed to create directory %s: %v", dir, err)
 		} else {
-			created++
+			fmt.Printf("Directory ensured: %s\n", dir)
 		}
-	}
-
-	fmt.Printf("Created/verified %d directories\n", created)
-}
-
-func logConfigurationStatus(cfg *config.Config) {
-	fmt.Println("\n📋 Configuration Status:")
-	fmt.Println("========================")
-
-	// Application settings
-	fmt.Printf("🌐 URLs: Frontend=%s, API=%s\n", cfg.AppURL, cfg.APIUrl)
-	fmt.Printf("🔒 Security: JWT=%s\n", maskValue(cfg.JWTSecret))
-
-	// Database
-	dbStatus := "❌ Not configured"
-	if cfg.DBHost != "" && cfg.DBUser != "" {
-		dbStatus = fmt.Sprintf("✅ %s@%s:%d/%s", cfg.DBUser, cfg.DBHost, cfg.DBPort, cfg.DBName)
-	}
-	fmt.Printf("🗄️  Database: %s\n", dbStatus)
-
-	// Email
-	emailStatus := "❌ Not configured"
-	if cfg.SMTPHost != "" && cfg.SMTPUser != "" {
-		emailStatus = fmt.Sprintf("✅ %s@%s:%d", cfg.SMTPUser, cfg.SMTPHost, cfg.SMTPPort)
-	}
-	fmt.Printf("📧 Email: %s\n", emailStatus)
-
-	// Payment
-	paypalStatus := "❌ Not configured"
-	if cfg.PayPalClientID != "" {
-		paypalStatus = "✅ Configured"
-	}
-	fmt.Printf("💳 PayPal: %s\n", paypalStatus)
-
-	// OAuth
-	googleStatus := "❌ Not configured"
-	if cfg.GoogleClientID != "" {
-		googleStatus = "✅ Configured"
-	}
-	fmt.Printf("🔑 Google OAuth: %s\n", googleStatus)
-
-	fmt.Println("========================")
-
-	// Configuration warnings
-	warnings := []string{}
-	if cfg.JWTSecret == "your-default-secret-key" {
-		warnings = append(warnings, "⚠️  Using default JWT secret - change in production!")
-	}
-	if cfg.DBPassword == "" {
-		warnings = append(warnings, "⚠️  Database password is empty")
-	}
-	if !cfg.Debug && (cfg.SMTPHost == "" || cfg.SMTPUser == "") {
-		warnings = append(warnings, "⚠️  Email not configured - users won't receive notifications")
-	}
-
-	if len(warnings) > 0 {
-		fmt.Println("\n⚠️  Configuration Warnings:")
-		for _, warning := range warnings {
-			fmt.Println("   " + warning)
-		}
-		fmt.Println()
 	}
 }
 
-func maskValue(value string) string {
-	if value == "" {
-		return "❌ Not set"
+// printRoutes prints all registered routes (existing function - no changes needed)
+func printRoutes(r *gin.Engine) {
+	fmt.Println("\n=== Registered Routes ===")
+	routes := r.Routes()
+
+	for _, route := range routes {
+		fmt.Printf("%-8s %s\n", route.Method, route.Path)
 	}
-	if value == "your-default-secret-key" {
-		return "⚠️  Default (change required)"
-	}
-	if len(value) < 8 {
-		return "✅ Set (short)"
-	}
-	return "✅ Set (secure)"
+
+	fmt.Printf("\nTotal routes: %d\n", len(routes))
+	fmt.Println("========================\n")
 }

@@ -15,60 +15,12 @@ import (
 	"github.com/MegaPDF/megapdf-official/api/internal/handlers"
 	"github.com/MegaPDF/megapdf-official/api/internal/middleware"
 	"github.com/MegaPDF/megapdf-official/api/internal/models"
-	"github.com/MegaPDF/megapdf-official/api/internal/repository"
 	"github.com/MegaPDF/megapdf-official/api/internal/services"
 	"github.com/gin-gonic/gin"
 	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"gorm.io/gorm"
 )
-
-func ResetCustomPricing(c *gin.Context) {
-	pricingRepo := repository.NewPricingRepository()
-	pricing, err := pricingRepo.GetPricingSettings()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to get pricing settings: " + err.Error(),
-		})
-		return
-	}
-
-	// Clear all custom prices or specific ones
-	pricing.CustomPrices = make(map[string]float64)
-
-	// Make sure global price is correct
-	pricing.OperationCost = 0.005
-
-	// Save the updated pricing
-	if err := pricingRepo.SavePricingSettings(pricing); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to save updated pricing: " + err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Custom pricing cleared, global price set to 0.005",
-	})
-}
-
-func DebugCustomPrices(c *gin.Context) {
-	pricingRepo := repository.NewPricingRepository()
-	pricing, err := pricingRepo.GetPricingSettings()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to get pricing settings: " + err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"globalPrice":   pricing.OperationCost,
-		"customPrices":  pricing.CustomPrices,
-		"compressPrice": pricing.CustomPrices["compress"],
-	})
-}
 
 func maskPassword(password string) string {
 	if password != "" {
@@ -140,7 +92,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	fileHandler := handlers.NewFileHandler(cfg)
 	adminHandler := handlers.NewAdminHandler()
 	paypalWebhookHandler := handlers.NewPayPalWebhookHandler()
-	envFileHandler := handlers.NewEnvFileHandler()
 
 	fmt.Println("Setting email service on auth handler")
 	authHandler.SetEmailService(emailService)
@@ -331,19 +282,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			admin.POST("/settings/pdf-tools/enable-all", pdfToolsHandler.EnableAllTools)
 			admin.POST("/settings/pdf-tools/disable-all", pdfToolsHandler.DisableAllTools)
 			admin.GET("/settings/pdf-tools/categories", pdfToolsHandler.GetToolsByCategory)
-
-			// NEW: Environment variable management routes
-			env := admin.Group("/environment")
-			{
-				env.GET("/status", envFileHandler.GetEnvironmentStatus)       // ← Make sure these GET routes exist
-				env.GET("/variables", envFileHandler.GetEnvironmentVariables) // ← Make sure these GET routes exist
-				env.PUT("/variables", envFileHandler.UpdateEnvironmentVariables)
-				env.POST("/validate", envFileHandler.ValidateEnvironmentVariables)
-				env.GET("/file", envFileHandler.GetEnvironmentFileContent) // ← Make sure these GET routes exist
-				env.POST("/create", envFileHandler.CreateEnvironmentFile)
-				env.GET("/backups", envFileHandler.GetBackupFiles) // ← Make sure these GET routes exist
-				env.POST("/restore/:backup", envFileHandler.RestoreFromBackup)
-			}
 
 			// Environment configuration endpoint (read-only overview)
 			admin.GET("/config", func(c *gin.Context) {

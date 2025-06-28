@@ -1,19 +1,19 @@
-// internal/config/config.go - Updated to use .env file
+// internal/config/config.go
 package config
 
 import (
-	"bufio"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/joho/godotenv"
 )
 
-// Config holds all the application configuration
+// Config holds application configuration
 type Config struct {
-	Port               int
+	Port int
+
 	JWTSecret          string
 	TempDir            string
 	UploadDir          string
@@ -34,120 +34,47 @@ type Config struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	OAuthRedirectURL   string
-	// DB Config
-	DBHost            string
-	DBPort            int
-	DBName            string
-	DBUser            string
-	DBPassword        string
-	DBCharset         string
-	DBCollation       string
-	DBTimezone        string
-	DBMaxIdleConns    int
-	DBMaxOpenConns    int
-	DBConnMaxLifetime string
+
+	// SQLite Database config (simplified from MySQL)
+	DBPath string // Single path instead of host/port/user/password
+
+	// App configuration
+	SiteName                 string
+	SiteDescription          string
+	MaintenanceMode          bool
+	RegistrationEnabled      bool
+	RequireEmailVerification bool
+	PasswordMinLength        int
+	PasswordRequireUppercase bool
+	PasswordRequireNumbers   bool
+	PasswordRequireSymbols   bool
+	SessionTimeout           int
+	MaxLoginAttempts         int
+	CORSAllowedOrigins       []string
+	EmailProvider            string
+	EmailFromName            string
+	RateLimitRequests        int
+	MaxFileSize              int64
+	APITimeout               int
+	LoggingEnabled           bool
+	LogLevel                 string
 }
 
-var (
-	globalConfig *Config
-	configMutex  sync.RWMutex
-	envFilePath  string
-)
-
-// LoadConfig loads configuration from .env file and environment variables
+// LoadConfig loads configuration from environment variables
 func LoadConfig() *Config {
-	configMutex.Lock()
-	defer configMutex.Unlock()
-
-	// Find .env file
-	envFilePath = findEnvFile()
-
 	// Load .env file if it exists
-	if envFilePath != "" {
-		if err := godotenv.Load(envFilePath); err != nil {
-			// Don't fail if .env file doesn't exist or has issues
-			// Fall back to environment variables
-		}
-	}
+	_ = godotenv.Load()
 
-	// Create config with values from environment (now includes .env values)
-	config := createConfigFromEnv()
-	globalConfig = config
-
-	return config
-}
-
-// ReloadConfig reloads configuration from .env file
-func ReloadConfig() *Config {
-	configMutex.Lock()
-	defer configMutex.Unlock()
-
-	// Clear existing environment variables that came from .env
-	clearEnvFromFile()
-
-	// Reload .env file
-	if envFilePath != "" {
-		if err := godotenv.Load(envFilePath); err != nil {
-			// Log error but continue with existing environment
-		}
-	}
-
-	// Create new config
-	config := createConfigFromEnv()
-	globalConfig = config
-
-	return config
-}
-
-// GetConfig returns the current global configuration (thread-safe)
-func GetConfig() *Config {
-	configMutex.RLock()
-	defer configMutex.RUnlock()
-
-	if globalConfig == nil {
-		// If no config loaded yet, load it now
-		configMutex.RUnlock()
-		return LoadConfig()
-	}
-
-	return globalConfig
-}
-
-// GetEnvFilePath returns the path to the .env file being used
-func GetEnvFilePath() string {
-	return envFilePath
-}
-
-// findEnvFile finds the .env file in current or parent directories
-func findEnvFile() string {
-	// Check current directory first
-	if _, err := os.Stat(".env"); err == nil {
-		return ".env"
-	}
-
-	// Check parent directory (for cases where we're in api/ subdirectory)
-	if _, err := os.Stat("../.env"); err == nil {
-		return "../.env"
-	}
-
-	// Check if ENV_FILE_PATH is set
-	if path := os.Getenv("ENV_FILE_PATH"); path != "" {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-
-	return "" // No .env file found
-}
-
-// createConfigFromEnv creates config from current environment variables
-func createConfigFromEnv() *Config {
 	port, _ := strconv.Atoi(getEnv("PORT", "8080"))
 	smtpPort, _ := strconv.Atoi(getEnv("SMTP_PORT", "587"))
-	dbPort, _ := strconv.Atoi(getEnv("DB_PORT", "3306"))
-	dbMaxIdleConns, _ := strconv.Atoi(getEnv("DB_MAX_IDLE_CONNS", "10"))
-	dbMaxOpenConns, _ := strconv.Atoi(getEnv("DB_MAX_OPEN_CONNS", "100"))
-	dbConnMaxLifetime := getEnv("DB_CONN_MAX_LIFETIME", "1h")
+
+	// SQLite database path
+	dbPath := getEnv("DB_PATH", "data/megapdf.db")
+
+	// Ensure absolute path
+	if !filepath.IsAbs(dbPath) {
+		dbPath = filepath.Join(".", dbPath)
+	}
 
 	return &Config{
 		Port: port,
@@ -173,75 +100,79 @@ func createConfigFromEnv() *Config {
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
 		OAuthRedirectURL:   getEnv("OAUTH_REDIRECT_URL", "http://localhost:8080/api/auth/google/callback"),
 
-		// Database config
-		DBHost:            getEnv("DB_HOST", "127.0.0.1"),
-		DBPort:            dbPort,
-		DBName:            getEnv("DB_NAME", "megapdf"),
-		DBUser:            getEnv("DB_USER", "root"),
-		DBPassword:        getEnv("DB_PASSWORD", ""),
-		DBCharset:         getEnv("DB_CHARSET", "utf8mb4"),
-		DBCollation:       getEnv("DB_COLLATION", "utf8mb4_unicode_ci"),
-		DBTimezone:        getEnv("DB_TIMEZONE", "UTC"),
-		DBMaxIdleConns:    dbMaxIdleConns,
-		DBMaxOpenConns:    dbMaxOpenConns,
-		DBConnMaxLifetime: dbConnMaxLifetime,
-	}
-}
+		// SQLite Database config
+		DBPath: dbPath,
 
-// clearEnvFromFile clears environment variables that might have come from .env file
-func clearEnvFromFile() {
-	if envFilePath == "" {
-		return
-	}
-
-	// Read .env file to get list of variables to clear
-	file, err := os.Open(envFilePath)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			// Don't clear system environment variables, only unset if they're not in system env
-			if os.Getenv(key) != "" {
-				os.Unsetenv(key)
-			}
-		}
+		// App configuration with defaults
+		SiteName:                 getEnv("SITE_NAME", "MegaPDF"),
+		SiteDescription:          getEnv("SITE_DESCRIPTION", "Professional PDF Processing Service"),
+		MaintenanceMode:          getEnv("MAINTENANCE_MODE", "false") == "true",
+		RegistrationEnabled:      getEnv("REGISTRATION_ENABLED", "true") == "true",
+		RequireEmailVerification: getEnv("REQUIRE_EMAIL_VERIFICATION", "true") == "true",
+		PasswordMinLength:        getIntEnv("PASSWORD_MIN_LENGTH", 8),
+		PasswordRequireUppercase: getEnv("PASSWORD_REQUIRE_UPPERCASE", "true") == "true",
+		PasswordRequireNumbers:   getEnv("PASSWORD_REQUIRE_NUMBERS", "true") == "true",
+		PasswordRequireSymbols:   getEnv("PASSWORD_REQUIRE_SYMBOLS", "false") == "true",
+		SessionTimeout:           getIntEnv("SESSION_TIMEOUT", 7200), // 2 hours
+		MaxLoginAttempts:         getIntEnv("MAX_LOGIN_ATTEMPTS", 5),
+		CORSAllowedOrigins:       getCorsOrigins([]string{"http://localhost:3000"}),
+		EmailProvider:            getEnv("EMAIL_PROVIDER", "smtp"),
+		EmailFromName:            getEnv("EMAIL_FROM_NAME", "MegaPDF"),
+		RateLimitRequests:        getIntEnv("RATE_LIMIT_REQUESTS", 100),
+		MaxFileSize:              getInt64Env("MAX_FILE_SIZE", 100*1024*1024), // 100MB
+		APITimeout:               getIntEnv("API_TIMEOUT", 30),
+		LoggingEnabled:           getEnv("LOGGING_ENABLED", "true") == "true",
+		LogLevel:                 getEnv("LOG_LEVEL", "info"),
 	}
 }
 
 // getEnv gets an environment variable or returns a default value
 func getEnv(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
+	if value := os.Getenv(key); value != "" {
+		return value
 	}
-	return value
+	return defaultValue
 }
 
-// UpdateConfigFromEnvFile forces a reload from .env file
-func UpdateConfigFromEnvFile() error {
-	if envFilePath == "" {
-		envFilePath = findEnvFile()
-	}
-
-	if envFilePath != "" {
-		// Load .env file
-		if err := godotenv.Overload(envFilePath); err != nil {
-			return err
+// getIntEnv gets an integer environment variable or returns a default value
+func getIntEnv(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
 		}
 	}
+	return defaultValue
+}
 
-	// Reload config
-	ReloadConfig()
-	return nil
+// getInt64Env gets an int64 environment variable or returns a default value
+func getInt64Env(key string, defaultValue int64) int64 {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+// getCorsOrigins parses CORS origins from environment variable
+func getCorsOrigins(defaultOrigins []string) []string {
+	originsStr := getEnv("CORS_ALLOWED_ORIGINS", "")
+	if originsStr == "" {
+		return defaultOrigins
+	}
+
+	origins := strings.Split(originsStr, ",")
+	for i, origin := range origins {
+		origins[i] = strings.TrimSpace(origin)
+	}
+	return origins
+}
+
+// GetEnvFilePath returns the path to the .env file (for compatibility)
+func GetEnvFilePath() string {
+	// Check if .env file exists in current directory
+	if _, err := os.Stat(".env"); err == nil {
+		return ".env"
+	}
+	return ""
 }

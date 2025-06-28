@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-// PDFToolSettings stores settings for all PDF tools, including enabled/disabled status
+// PDFToolSettings stores PDF tool configuration
 type PDFToolSettings struct {
-	ID          string `gorm:"primaryKey;type:varchar(100)"`
-	Settings    string `gorm:"type:json"` // JSON for MySQL
+	ID          string `gorm:"primaryKey;type:text"`
+	Settings    string `gorm:"type:text"` // JSON configuration
 	Description string `gorm:"type:text"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time

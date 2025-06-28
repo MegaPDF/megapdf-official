@@ -5,15 +5,15 @@ import (
 	"time"
 )
 
-// Setting represents a system setting
+// Setting stores application settings
 type Setting struct {
-	ID          string    `json:"id" gorm:"primaryKey"`
-	Category    string    `json:"category" gorm:"index"`
-	Key         string    `json:"key" gorm:"index"`
-	Value       string    `json:"value" gorm:"type:text"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string `gorm:"primaryKey;type:text"`
+	Category    string `gorm:"type:text;index"`
+	Key         string `gorm:"type:text;index"`
+	Value       string `gorm:"type:text"`
+	Description string `gorm:"type:text"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 // DefaultSettings returns a map of all default settings by category

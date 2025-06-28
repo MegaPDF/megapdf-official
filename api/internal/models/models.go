@@ -1,17 +1,17 @@
-// internal/models/models.go
+// internal/models/models.go - SQLite optimized version
 package models
 
 import "time"
 
 type User struct {
-	ID                  string `gorm:"primaryKey;type:varchar(100)"`
-	Name                string `gorm:"type:varchar(255)"`
-	Email               string `gorm:"uniqueIndex;type:varchar(255)"`
+	ID                  string `gorm:"primaryKey;type:text"`
+	Name                string `gorm:"type:text"`
+	Email               string `gorm:"uniqueIndex;type:text"`
 	EmailVerified       *time.Time
-	Image               string  `gorm:"type:varchar(255)"`
-	Password            string  `gorm:"type:varchar(255)"`
-	Role                string  `gorm:"type:varchar(50);default:'user'"`
-	VerificationToken   *string `gorm:"type:varchar(255)"`
+	Image               string  `gorm:"type:text"`
+	Password            string  `gorm:"type:text"`
+	Role                string  `gorm:"type:text;default:'user'"`
+	VerificationToken   *string `gorm:"type:text"`
 	IsEmailVerified     bool    `gorm:"default:false"`
 	Balance             float64 `gorm:"type:decimal(10,3);default:0"`
 	FreeOperationsUsed  int     `gorm:"default:0"`
@@ -29,13 +29,13 @@ type User struct {
 }
 
 type Transaction struct {
-	ID           string  `gorm:"primaryKey;type:varchar(100)"`
-	UserID       string  `gorm:"type:varchar(100);index"`
-	Amount       float64 `gorm:"type:decimal(10,2)"`
-	BalanceAfter float64 `gorm:"type:decimal(10,2)"`
-	Description  string  `gorm:"type:varchar(255)"`
-	PaymentID    string  `gorm:"type:varchar(100)"`
-	Status       string  `gorm:"type:varchar(50);default:'completed'"`
+	ID           string  `gorm:"primaryKey;type:text"`
+	UserID       string  `gorm:"type:text;index"`
+	Amount       float64 `gorm:"type:real"`
+	BalanceAfter float64 `gorm:"type:real"`
+	Description  string  `gorm:"type:text"`
+	PaymentID    string  `gorm:"type:text"`
+	Status       string  `gorm:"type:text;default:'completed'"`
 	CreatedAt    time.Time
 
 	// Relations
@@ -43,18 +43,18 @@ type Transaction struct {
 }
 
 type Account struct {
-	ID                string  `gorm:"primaryKey;type:varchar(100)"`
-	UserID            string  `gorm:"type:varchar(100);index"`
-	Type              string  `gorm:"type:varchar(50)"`
-	Provider          string  `gorm:"type:varchar(50)"`
-	ProviderAccountID string  `gorm:"type:varchar(100)"`
+	ID                string  `gorm:"primaryKey;type:text"`
+	UserID            string  `gorm:"type:text;index"`
+	Type              string  `gorm:"type:text"`
+	Provider          string  `gorm:"type:text"`
+	ProviderAccountID string  `gorm:"type:text"`
 	RefreshToken      *string `gorm:"type:text"`
 	AccessToken       *string `gorm:"type:text"`
 	ExpiresAt         *int
-	TokenType         *string `gorm:"type:varchar(50)"`
-	Scope             *string `gorm:"type:varchar(255)"`
+	TokenType         *string `gorm:"type:text"`
+	Scope             *string `gorm:"type:text"`
 	IDToken           *string `gorm:"type:text"`
-	SessionState      *string `gorm:"type:varchar(255)"`
+	SessionState      *string `gorm:"type:text"`
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 
@@ -63,9 +63,9 @@ type Account struct {
 }
 
 type Session struct {
-	ID           string `gorm:"primaryKey;type:varchar(100)"`
-	SessionToken string `gorm:"uniqueIndex;type:varchar(255)"`
-	UserID       string `gorm:"type:varchar(100);index"`
+	ID           string `gorm:"primaryKey;type:text"`
+	SessionToken string `gorm:"uniqueIndex;type:text"`
+	UserID       string `gorm:"type:text;index"`
 	Expires      time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
@@ -76,10 +76,10 @@ type Session struct {
 
 // ApiKey model stores API keys for users
 type ApiKey struct {
-	ID        string `gorm:"primaryKey;type:varchar(100)"`
-	UserID    string `gorm:"type:varchar(100);index"`
-	Name      string `gorm:"type:varchar(100)"`
-	Key       string `gorm:"uniqueIndex;type:varchar(255)"`
+	ID        string `gorm:"primaryKey;type:text"`
+	UserID    string `gorm:"type:text;index"`
+	Name      string `gorm:"type:text"`
+	Key       string `gorm:"uniqueIndex;type:text"`
 	LastUsed  *time.Time
 	ExpiresAt *time.Time
 	CreatedAt time.Time
@@ -90,9 +90,9 @@ type ApiKey struct {
 }
 
 type UsageStats struct {
-	ID        string `gorm:"primaryKey;type:varchar(100)"`
-	UserID    string `gorm:"type:varchar(100);index"`
-	Operation string `gorm:"type:varchar(50);index"`
+	ID        string `gorm:"primaryKey;type:text"`
+	UserID    string `gorm:"type:text;index"`
+	Operation string `gorm:"type:text;index"`
 	Count     int
 	Date      time.Time `gorm:"index"`
 	CreatedAt time.Time
@@ -103,16 +103,16 @@ type UsageStats struct {
 }
 
 type PasswordResetToken struct {
-	ID        string `gorm:"primaryKey;type:varchar(100)"`
-	Email     string `gorm:"type:varchar(255);index"`
-	Token     string `gorm:"uniqueIndex;type:varchar(255)"`
+	ID        string `gorm:"primaryKey;type:text"`
+	Email     string `gorm:"type:text;index"`
+	Token     string `gorm:"uniqueIndex;type:text"`
 	Expires   time.Time
 	CreatedAt time.Time
 }
 
 type VerificationToken struct {
-	Identifier string `gorm:"uniqueIndex;type:varchar(255)"`
-	Token      string `gorm:"uniqueIndex;type:varchar(255)"`
+	Identifier string `gorm:"uniqueIndex;type:text"`
+	Token      string `gorm:"uniqueIndex;type:text"`
 	Expires    time.Time
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
@@ -124,14 +124,14 @@ type PaymentWebhookEvent struct {
 	EventType    string `gorm:"type:varchar(100)"`
 	ResourceType string `gorm:"type:varchar(100)"`
 	ResourceId   string `gorm:"type:varchar(100)"`
-	RawData      string `gorm:"type:longtext"` // Using longtext for MySQL
+	RawData      string `gorm:"type:text"` // Change from longtext to text for SQLite
 	CreatedAt    time.Time
 }
 
 // LowBalanceAlert tracks when low balance warnings have been sent
 type LowBalanceAlert struct {
-	ID        string `gorm:"primaryKey;type:varchar(100)"`
-	UserID    string `gorm:"type:varchar(100);index"`
+	ID        string `gorm:"primaryKey;type:text"`
+	UserID    string `gorm:"type:text;index"`
 	CreatedAt time.Time
 
 	// Relations
@@ -140,9 +140,9 @@ type LowBalanceAlert struct {
 
 // OperationsAlert tracks when operation limit warnings or exhausted notifications have been sent
 type OperationsAlert struct {
-	ID        string `gorm:"primaryKey;type:varchar(100)"`
-	UserID    string `gorm:"type:varchar(100);index"`
-	Type      string `gorm:"type:varchar(50)"` // "warning" or "exhausted"
+	ID        string `gorm:"primaryKey;type:text"`
+	UserID    string `gorm:"type:text;index"`
+	Type      string `gorm:"type:text"` // "warning" or "exhausted"
 	CreatedAt time.Time
 
 	// Relations

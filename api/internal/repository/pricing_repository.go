@@ -90,8 +90,6 @@ func (r *PricingRepository) SavePricingSettings(pricing *models.CustomPricing) e
 		// Create new record
 		setting = models.PricingSetting{
 			ID:          uuid.New().String(),
-			Key:         "pricing_settings",
-			Value:       string(pricingJSON),
 			Description: "Global pricing settings for operations",
 		}
 		err := db.DB.Create(&setting).Error
@@ -132,12 +130,6 @@ func (r *PricingRepository) ForceResetPricing() error {
 		CustomPrices:          make(map[string]float64),
 	}
 
-	// Marshal to JSON
-	pricingJSON, err := json.Marshal(pricing)
-	if err != nil {
-		return err
-	}
-
 	// Delete existing settings
 	if err := db.DB.Where("`key` = ?", "pricing_settings").Delete(&models.PricingSetting{}).Error; err != nil {
 		fmt.Println("WARNING: Failed to delete existing pricing:", err)
@@ -146,8 +138,6 @@ func (r *PricingRepository) ForceResetPricing() error {
 	// Create new settings record
 	pricingSetting := models.PricingSetting{
 		ID:          uuid.New().String(),
-		Key:         "pricing_settings",
-		Value:       string(pricingJSON),
 		Description: "RESET: Global pricing settings for operations",
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
