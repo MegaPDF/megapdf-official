@@ -1,9 +1,0 @@
-# manifests/database/postgres-configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: postgres-config
-  namespace: scanpro
-data:
-  POSTGRES_DB: "scanprodb"
-  POSTGRES_USER: "scanprouser"
