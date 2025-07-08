@@ -1,10 +1,9 @@
 // internal/constants/pricing.go
 package constants
 
-// Pricing constants
 const (
-	OperationCost         = 0.005
-	FreeOperationsMonthly = 500
+	DEFAULT_OPERATION_COST          = 0.005
+	DEFAULT_FREE_OPERATIONS_MONTHLY = 500
 )
 
 // API operation constants

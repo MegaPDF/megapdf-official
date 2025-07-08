@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/MegaPDF/megapdf-official/api/internal/constants"
 	"github.com/MegaPDF/megapdf-official/api/internal/models"
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
@@ -149,6 +150,7 @@ func InitDB() (*gorm.DB, error) {
 		&models.PricingSetting{},
 		&models.PDFToolSettings{},
 		&models.AdminSettings{},
+		&models.BrandingSetting{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to auto-migrate database schema: %w", err)
@@ -175,12 +177,99 @@ func InitDB() (*gorm.DB, error) {
 	if err := initializeDefaultPricing(db); err != nil {
 		return nil, fmt.Errorf("failed to initialize default pricing: %w", err)
 	}
+
+	if err := initializeDefaultBranding(db); err != nil {
+		return nil, fmt.Errorf("failed to initialize default branding: %w", err)
+	}
 	// Store DB in package variable for global access
 	DB = db
 	fmt.Println("SQLite database initialized successfully!")
 	return db, nil
 }
 
+func initializeDefaultBranding(db *gorm.DB) error {
+	// Check if branding settings already exist
+	var count int64
+	if err := db.Model(&models.BrandingSetting{}).Where("`key` = ?", "branding_settings").Count(&count).Error; err != nil {
+		return err
+	}
+
+	if count > 0 {
+		fmt.Println("Branding settings already exist, skipping initialization")
+		return nil
+	}
+
+	// Create default branding configuration
+	defaultBranding := models.DefaultBrandingConfig()
+
+	// Marshal to JSON
+	brandingJSON, err := json.Marshal(defaultBranding)
+	if err != nil {
+		return fmt.Errorf("failed to marshal default branding: %w", err)
+	}
+
+	// Create default branding settings record
+	brandingSetting := models.BrandingSetting{
+		ID:          uuid.New().String(),
+		Key:         "branding_settings",
+		Value:       string(brandingJSON),
+		Description: "Dynamic branding settings for application",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	if err := db.Create(&brandingSetting).Error; err != nil {
+		return fmt.Errorf("failed to create default branding settings: %w", err)
+	}
+
+	fmt.Printf("Created default dynamic branding settings: app=%s, description=%s\n",
+		defaultBranding.AppName, defaultBranding.AppDescription)
+	return nil
+}
+
+func initializeDefaultPricing(db *gorm.DB) error {
+	// Check if pricing settings already exist
+	var count int64
+	if err := db.Model(&models.PricingSetting{}).Where("`key` = ?", "pricing_settings").Count(&count).Error; err != nil {
+		return err
+	}
+
+	if count > 0 {
+		fmt.Println("Pricing settings already exist, skipping initialization")
+		return nil
+	}
+
+	// Create default pricing configuration using new constants
+	defaultPricing := models.CustomPricing{
+		OperationCost:         constants.DEFAULT_OPERATION_COST,          // 0.005
+		FreeOperationsMonthly: constants.DEFAULT_FREE_OPERATIONS_MONTHLY, // 500
+		CustomPrices:          make(map[string]float64),
+	}
+
+	// Marshal to JSON
+	pricingJSON, err := json.Marshal(defaultPricing)
+	if err != nil {
+		return fmt.Errorf("failed to marshal default pricing: %w", err)
+	}
+
+	// Create default pricing settings record
+	pricingSetting := models.PricingSetting{
+		ID:          uuid.New().String(),
+		Key:         "pricing_settings",
+		Value:       string(pricingJSON),
+		Description: "Dynamic pricing settings for PDF operations (no static constants)",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	if err := db.Create(&pricingSetting).Error; err != nil {
+		return fmt.Errorf("failed to create default pricing settings: %w", err)
+	}
+
+	fmt.Printf("Created default dynamic pricing settings: global=%.6f, free=%d\n",
+		defaultPricing.OperationCost, defaultPricing.FreeOperationsMonthly)
+	return nil
+}
 func initializePDFToolsSettings(db *gorm.DB) error {
 	// Check if settings already exist
 	var count int64
@@ -263,48 +352,5 @@ func createAdminUser(db *gorm.DB) error {
 
 	fmt.Printf("Created default admin user - Email: admin@megapdf.com, Password: password\n")
 	fmt.Printf("Admin user ID: %s\n", adminID)
-	return nil
-}
-
-func initializeDefaultPricing(db *gorm.DB) error {
-	// Check if pricing settings already exist
-	var count int64
-	if err := db.Model(&models.PricingSetting{}).Where("`key` = ?", "pricing_settings").Count(&count).Error; err != nil {
-		return err
-	}
-
-	if count > 0 {
-		fmt.Println("Pricing settings already exist, skipping initialization")
-		return nil
-	}
-
-	// Create default pricing configuration
-	defaultPricing := models.CustomPricing{
-		OperationCost:         0.001, // $0.001 per operation
-		FreeOperationsMonthly: 100,   // 100 free operations per month
-		CustomPrices:          make(map[string]float64),
-	}
-
-	// Marshal to JSON
-	pricingJSON, err := json.Marshal(defaultPricing)
-	if err != nil {
-		return fmt.Errorf("failed to marshal default pricing: %w", err)
-	}
-
-	// Create default pricing settings record
-	pricingSetting := models.PricingSetting{
-		ID:          uuid.New().String(),
-		Key:         "pricing_settings",
-		Value:       string(pricingJSON),
-		Description: "Default pricing settings for PDF operations",
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}
-
-	if err := db.Create(&pricingSetting).Error; err != nil {
-		return fmt.Errorf("failed to create default pricing settings: %w", err)
-	}
-
-	fmt.Println("Created default pricing settings")
 	return nil
 }

@@ -88,6 +88,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	trackUsageHandler := handlers.NewTrackUsageHandler()
 	apiKeyHandler := handlers.NewApiKeyHandler(apiKeyService)
 	fileHandler := handlers.NewFileHandler(cfg)
+	pricingHandler := handlers.NewPricingHandler(db, cfg)
 	paypalWebhookHandler := handlers.NewPayPalWebhookHandler()
 	adminHandler := handlers.NewAdminHandler(cfg, db)
 	fmt.Println("Setting email service on auth handler")
@@ -115,6 +116,12 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 
 	api := r.Group("/api")
 	{
+		pricing := api.Group("/pricing")
+		{
+			pricing.GET("", pricingHandler.GetPublicPricing)                         // GET /api/pricing
+			pricing.GET("/operation/:operation", pricingHandler.GetOperationPricing) // GET /api/pricing/operation/compress
+			pricing.POST("/calculate", pricingHandler.CalculatePricing)              // POST /api/pricing/calculate
+		}
 		api.GET("/tools/status", toolStatusHandler.GetToolStatus)
 		api.POST("/validate-key", keyValidationHandler.ValidateKey)
 		api.GET("/validate-key", keyValidationHandler.ValidateKey)
@@ -291,6 +298,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			// Pricing Management
 			admin.GET("/pricing", adminHandler.GetPricing)
 			admin.PUT("/pricing", adminHandler.UpdatePricing)
+			admin.GET("/branding", adminHandler.GetBranding)
+			admin.PUT("/branding", adminHandler.UpdateBranding)
+			admin.POST("/branding/reset", adminHandler.ResetBranding)
 		}
 
 	}

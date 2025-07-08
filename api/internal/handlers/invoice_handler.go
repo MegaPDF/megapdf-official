@@ -108,7 +108,7 @@ func (h *InvoiceHandler) GenerateInvoice(c *gin.Context) {
 			"details": gin.H{
 				"balance":                 result.CurrentBalance,
 				"freeOperationsRemaining": result.FreeOperationsRemaining,
-				"operationCost":           constants.OperationCost,
+				"operationCost":           constants.DEFAULT_OPERATION_COST,
 			},
 		})
 		return
@@ -227,7 +227,7 @@ func (h *InvoiceHandler) GenerateInvoice(c *gin.Context) {
 			"usedFreeOperation":       result.UsedFreeOperation,
 			"freeOperationsRemaining": result.FreeOperationsRemaining,
 			"currentBalance":          result.CurrentBalance,
-			"operationCost":           constants.OperationCost,
+			"operationCost":           constants.DEFAULT_OPERATION_COST,
 		},
 	})
 }

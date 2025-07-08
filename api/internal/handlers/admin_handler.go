@@ -15,14 +15,16 @@ import (
 )
 
 type AdminHandler struct {
-	adminService *services.AdminService
-	config       *config.Config
+	adminService    *services.AdminService
+	config          *config.Config
+	brandingService *services.BrandingService
 }
 
 func NewAdminHandler(cfg *config.Config, db *gorm.DB) *AdminHandler {
 	return &AdminHandler{
-		adminService: services.NewAdminService(cfg, db),
-		config:       cfg,
+		adminService:    services.NewAdminService(cfg, db),
+		config:          cfg,
+		brandingService: services.NewBrandingService(),
 	}
 }
 
@@ -99,6 +101,71 @@ func (h *AdminHandler) GetSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"settings": settings})
+}
+
+// @Summary Get branding settings
+// @Description Get current branding configuration
+// @Tags admin
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} models.BrandingConfig
+// @Failure 401 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /api/admin/branding [get]
+func (h *AdminHandler) GetBranding(c *gin.Context) {
+	branding, err := h.brandingService.GetBrandingSettings()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, branding)
+}
+
+// @Summary Update branding settings
+// @Description Update branding configuration
+// @Tags admin
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param branding body models.BrandingConfig true "Branding configuration"
+// @Success 200 {object} object{message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 401 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /api/admin/branding [put]
+func (h *AdminHandler) UpdateBranding(c *gin.Context) {
+	var branding models.BrandingConfig
+	if err := c.ShouldBindJSON(&branding); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+
+	// Save branding settings
+	if err := h.brandingService.UpdateBrandingSettings(&branding); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Branding updated successfully"})
+}
+
+// @Summary Reset branding to defaults
+// @Description Reset branding configuration to default values
+// @Tags admin
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} object{message=string}
+// @Failure 401 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /api/admin/branding/reset [post]
+func (h *AdminHandler) ResetBranding(c *gin.Context) {
+	if err := h.brandingService.ResetToDefaults(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Branding reset to defaults successfully"})
 }
 
 // @Summary Update admin settings

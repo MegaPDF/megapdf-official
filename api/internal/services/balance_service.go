@@ -84,7 +84,7 @@ func (s *BalanceService) ProcessOperation(userID string, operation string) (*Ope
 	now := time.Now()
 	freeOpsReset := user.FreeOperationsReset
 	freeOpsUsed := user.FreeOperationsUsed
-	freeOperationsLimit := constants.FreeOperationsMonthly
+	freeOperationsLimit := constants.DEFAULT_FREE_OPERATIONS_MONTHLY
 
 	// Try to get from pricing settings
 	pricingRepo := repository.NewPricingRepository()
@@ -330,7 +330,7 @@ func (s *BalanceService) GetBalance(userID string) (map[string]interface{}, erro
 	resetDate := user.FreeOperationsReset
 
 	// Get free operations limit from pricing settings
-	freeOperationsLimit := constants.FreeOperationsMonthly
+	freeOperationsLimit := constants.DEFAULT_FREE_OPERATIONS_MONTHLY
 	pricingRepo := repository.NewPricingRepository()
 	if pricing, err := pricingRepo.GetPricingSettings(); err == nil {
 		freeOperationsLimit = pricing.FreeOperationsMonthly

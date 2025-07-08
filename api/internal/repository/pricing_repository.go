@@ -24,41 +24,35 @@ func NewPricingRepository() *PricingRepository {
 
 // GetPricingSettings retrieves all pricing settings
 func (r *PricingRepository) GetPricingSettings() (*models.CustomPricing, error) {
-	// Debug logging
-	fmt.Println("Fetching pricing settings from database")
+	fmt.Println("PRICING REPO: Fetching pricing settings from database")
 
 	var setting models.PricingSetting
-	// Fix: Add backticks around `key` since it's a reserved SQL keyword
 	result := db.DB.Where("`key` = ?", "pricing_settings").First(&setting)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		// Debug logging
-		fmt.Println("No pricing settings found in database, using defaults")
+		fmt.Println("PRICING REPO: No pricing settings found in database, returning defaults")
 
-		// Return default settings if not found
+		// Return default settings if not found (no constants dependency)
 		return &models.CustomPricing{
-			OperationCost:         constants.OperationCost,
-			FreeOperationsMonthly: constants.FreeOperationsMonthly,
+			OperationCost:         constants.DEFAULT_OPERATION_COST,
+			FreeOperationsMonthly: constants.DEFAULT_FREE_OPERATIONS_MONTHLY,
 			CustomPrices:          make(map[string]float64),
 		}, nil
 	} else if result.Error != nil {
-		// Debug logging
-		fmt.Printf("Error fetching pricing settings: %v\n", result.Error)
+		fmt.Printf("PRICING REPO ERROR: Failed to fetch pricing settings: %v\n", result.Error)
 		return nil, result.Error
 	}
 
 	// Unmarshal the settings
-	fmt.Println("PRICING DEBUG: Retrieved settings from database, raw value:", setting.Value)
+	fmt.Printf("PRICING REPO: Retrieved settings from database, raw value: %s\n", setting.Value)
 	var pricing models.CustomPricing
 	if err := json.Unmarshal([]byte(setting.Value), &pricing); err != nil {
-		fmt.Printf("CRITICAL ERROR: Failed to unmarshal pricing settings: %v\n", err)
-		fmt.Println("Raw JSON:", setting.Value)
+		fmt.Printf("PRICING REPO CRITICAL ERROR: Failed to unmarshal pricing settings: %v\n", err)
+		fmt.Printf("Raw JSON: %s\n", setting.Value)
 		return nil, err
 	}
-	fmt.Printf("PRICING DEBUG: Unmarshaled settings: global=%.6f, free=%d, custom prices=%+v\n",
-		pricing.OperationCost, pricing.FreeOperationsMonthly, pricing.CustomPrices)
-	// Debug logging
-	fmt.Printf("Successfully fetched pricing settings: global=%.3f, free=%d, custom=%v\n",
+
+	fmt.Printf("PRICING REPO SUCCESS: Unmarshaled settings: global=%.6f, free=%d, custom prices=%+v\n",
 		pricing.OperationCost, pricing.FreeOperationsMonthly, pricing.CustomPrices)
 
 	return &pricing, nil
@@ -66,85 +60,58 @@ func (r *PricingRepository) GetPricingSettings() (*models.CustomPricing, error) 
 
 // SavePricingSettings saves pricing settings to the database
 func (r *PricingRepository) SavePricingSettings(pricing *models.CustomPricing) error {
-	// Debug logging
-	fmt.Printf("Saving pricing settings: global=%.3f, free=%d, custom=%v\n",
+	fmt.Printf("PRICING REPO: Saving pricing settings: global=%.6f, free=%d, custom=%+v\n",
 		pricing.OperationCost, pricing.FreeOperationsMonthly, pricing.CustomPrices)
 
 	// Marshal the settings to JSON
 	pricingJSON, err := json.Marshal(pricing)
 	if err != nil {
-		// Debug logging
-		fmt.Printf("Error marshaling pricing settings: %v\n", err)
+		fmt.Printf("PRICING REPO ERROR: Failed to marshal pricing settings: %v\n", err)
 		return err
 	}
 
 	// Check if record exists
 	var setting models.PricingSetting
-	// Fix: Add backticks around `key` since it's a reserved SQL keyword
 	result := db.DB.Where("`key` = ?", "pricing_settings").First(&setting)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		// Debug logging
-		fmt.Println("Creating new pricing settings record")
+		fmt.Println("PRICING REPO: Creating new pricing settings record")
 
 		// Create new record
 		setting = models.PricingSetting{
 			ID:          uuid.New().String(),
-			Description: "Global pricing settings for operations",
+			Key:         "pricing_settings",
+			Value:       string(pricingJSON),
+			Description: "Dynamic pricing settings for operations",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
 		}
+
 		err := db.DB.Create(&setting).Error
 		if err != nil {
-			// Debug logging
-			fmt.Printf("Error creating pricing settings: %v\n", err)
+			fmt.Printf("PRICING REPO ERROR: Failed to create pricing settings: %v\n", err)
 		} else {
-			// Debug logging
-			fmt.Println("Successfully created pricing settings")
+			fmt.Println("PRICING REPO SUCCESS: Created new pricing settings")
 		}
 		return err
 	} else if result.Error != nil {
-		// Debug logging
-		fmt.Printf("Error checking for existing pricing settings: %v\n", result.Error)
+		fmt.Printf("PRICING REPO ERROR: Failed to check for existing pricing settings: %v\n", result.Error)
 		return result.Error
 	}
 
-	// Debug logging
-	fmt.Printf("Updating existing pricing settings with ID %s\n", setting.ID)
+	fmt.Printf("PRICING REPO: Updating existing pricing settings with ID %s\n", setting.ID)
 
 	// Update existing record
-	err = db.DB.Model(&setting).Update("value", string(pricingJSON)).Error
+	err = db.DB.Model(&setting).Updates(map[string]interface{}{
+		"value":      string(pricingJSON),
+		"updated_at": time.Now(),
+	}).Error
+
 	if err != nil {
-		// Debug logging
-		fmt.Printf("Error updating pricing settings: %v\n", err)
+		fmt.Printf("PRICING REPO ERROR: Failed to update pricing settings: %v\n", err)
 	} else {
-		// Debug logging
-		fmt.Println("Successfully updated pricing settings")
+		fmt.Println("PRICING REPO SUCCESS: Updated pricing settings")
 	}
+
 	return err
-}
-
-func (r *PricingRepository) ForceResetPricing() error {
-	// Create correct pricing settings
-	pricing := models.CustomPricing{
-		OperationCost:         0.005, // EXPLICITLY SET CORRECT VALUE
-		FreeOperationsMonthly: 500,   // EXPLICITLY SET CORRECT VALUE
-		CustomPrices:          make(map[string]float64),
-	}
-
-	// Delete existing settings
-	if err := db.DB.Where("`key` = ?", "pricing_settings").Delete(&models.PricingSetting{}).Error; err != nil {
-		fmt.Println("WARNING: Failed to delete existing pricing:", err)
-	}
-
-	// Create new settings record
-	pricingSetting := models.PricingSetting{
-		ID:          uuid.New().String(),
-		Description: "RESET: Global pricing settings for operations",
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}
-
-	fmt.Printf("EMERGENCY FIX: Resetting pricing to global=%.6f, free=%d\n",
-		pricing.OperationCost, pricing.FreeOperationsMonthly)
-
-	return db.DB.Create(&pricingSetting).Error
 }

@@ -7,25 +7,27 @@ import (
 
 	"github.com/MegaPDF/megapdf-official/api/internal/constants"
 	"github.com/MegaPDF/megapdf-official/api/internal/models"
-	"github.com/MegaPDF/megapdf-official/api/internal/repository"
 	"gorm.io/gorm"
 )
 
-// API operation constants - now imported from constants package
+// API operation constants - static list of valid operations
 var APIOperations = constants.APIOperations
 
 type KeyValidationService struct {
-	db *gorm.DB
+	db             *gorm.DB
+	pricingService *PricingService
 }
 
 func NewKeyValidationService(db *gorm.DB) *KeyValidationService {
-	return &KeyValidationService{db: db}
+	return &KeyValidationService{
+		db:             db,
+		pricingService: NewPricingService(),
+	}
 }
 
 type ValidationResult struct {
-	Valid  bool
-	UserID string
-	// Permissions field can be removed or left empty
+	Valid                   bool
+	UserID                  string
 	FreeOperationsRemaining int
 	Balance                 float64
 	FreeOperationsReset     time.Time
@@ -61,11 +63,12 @@ func (s *KeyValidationService) ValidateKey(apiKey string, operation string) (*Va
 		}, nil
 	}
 
-	// No need to check permissions - all operations are allowed
-
 	// Update last used timestamp
 	now := time.Now()
 	s.db.Model(&keyRecord).Update("last_used", now)
+
+	// Get free operations limit from dynamic pricing
+	freeOperationsLimit := s.pricingService.GetFreeOperationsLimit()
 
 	// Check free operations reset date
 	var freeOpsUsed int = 0
@@ -83,8 +86,8 @@ func (s *KeyValidationService) ValidateKey(apiKey string, operation string) (*Va
 		freeOpsReset = keyRecord.User.FreeOperationsReset
 	}
 
-	// Calculate remaining free operations
-	freeOpsRemaining := constants.FreeOperationsMonthly - freeOpsUsed
+	// Calculate remaining free operations using dynamic limit
+	freeOpsRemaining := freeOperationsLimit - freeOpsUsed
 	if freeOpsRemaining < 0 {
 		freeOpsRemaining = 0
 	}
@@ -97,11 +100,12 @@ func (s *KeyValidationService) ValidateKey(apiKey string, operation string) (*Va
 		FreeOperationsReset:     freeOpsReset,
 	}, nil
 }
+
+// GetPricingSettings returns current pricing settings (for backward compatibility)
 func (s *KeyValidationService) GetPricingSettings() (float64, int, error) {
-	pricingRepo := repository.NewPricingRepository()
-	pricing, err := pricingRepo.GetPricingSettings()
+	pricing, err := s.pricingService.GetPricingSettings()
 	if err != nil {
-		return constants.OperationCost, constants.FreeOperationsMonthly, err
+		return constants.DEFAULT_OPERATION_COST, constants.DEFAULT_FREE_OPERATIONS_MONTHLY, err
 	}
 
 	return pricing.OperationCost, pricing.FreeOperationsMonthly, nil

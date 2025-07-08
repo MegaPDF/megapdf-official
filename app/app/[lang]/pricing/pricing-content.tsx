@@ -37,9 +37,9 @@ export function PricingContent() {
   const [depositAmount, setDepositAmount] = useState(10);
   const [pricingLoading, setPricingLoading] = useState(true);
   const [pricing, setPricing] = useState({
-    operationCost: 0.005,
-    freeOperationsMonthly: 500,
-    customPrices: {},
+    operationCost: 0.005, // Default operation cost (fallback only)
+    freeOperationsMonthly: 500, // Default free operations monthly (fallback only)
+    customPrices: {}, // Custom prices for specific operations
   });
 
   // Fetch pricing information from API
@@ -47,6 +47,8 @@ export function PricingContent() {
     async function fetchPricing() {
       try {
         setPricingLoading(true);
+        console.log("Fetching pricing from API..."); // Debug log
+
         const response = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/pricing`,
           {
@@ -59,23 +61,39 @@ export function PricingContent() {
         );
 
         if (!response.ok) {
-          // If API fails, use default values
-          console.warn("Failed to fetch pricing information, using defaults");
+          console.warn(`API request failed with status ${response.status}`);
+          toast.error("Failed to fetch current pricing. Using default values.");
           return;
         }
 
         const data = await response.json();
-        if (data.success && data.pricing) {
-          setPricing({
-            operationCost: data.pricing.operationCost || 0.005,
-            freeOperationsMonthly: data.pricing.freeOperationsMonthly || 500,
-            customPrices: data.pricing.customPrices || {},
-          });
+        console.log("Received pricing data:", data); // Debug log
+
+        // ✅ FIXED: Updated to match new API response format
+        if (data && typeof data.operationCost === "number") {
+          const newPricing = {
+            operationCost: data.operationCost,
+            freeOperationsMonthly: data.freeOperationsMonthly || 500,
+            customPrices: data.customPrices || {},
+          };
+
+          console.log("Setting new pricing:", newPricing); // Debug log
+          setPricing(newPricing);
 
           // Recalculate deposit based on new operation cost
           setDepositAmount(
-            calculateDeposit(operationsEstimate, data.pricing.operationCost)
+            calculateDeposit(operationsEstimate, newPricing.operationCost)
           );
+
+          // Show success message if pricing loaded from database
+          if (data.source === "database") {
+            console.log("✅ Pricing loaded from database successfully");
+          } else {
+            console.warn("⚠️ Using fallback pricing values");
+          }
+        } else {
+          console.error("Invalid pricing data structure:", data);
+          toast.error("Invalid pricing data received. Using default values.");
         }
       } catch (error) {
         console.error("Error fetching pricing:", error);
@@ -117,7 +135,7 @@ export function PricingContent() {
     router.push("/en/dashboard");
   };
 
-  // Pricing features
+  // Pricing features (now dynamic)
   const features = [
     `${pricing.freeOperationsMonthly} free operations every month`,
     `Pay-as-you-go pricing at $${pricing.operationCost.toFixed(

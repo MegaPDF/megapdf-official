@@ -81,7 +81,7 @@ func GetUserProfile(c *gin.Context) {
 
 	if user.FreeOperationsReset.Before(now) {
 		// If reset date has passed, user has all free operations available
-		freeOpsRemaining = constants.FreeOperationsMonthly
+		freeOpsRemaining = constants.DEFAULT_FREE_OPERATIONS_MONTHLY
 
 		// Next reset date would be first day of next month
 		nextMonth := now.AddDate(0, 1, 0)
@@ -98,7 +98,7 @@ func GetUserProfile(c *gin.Context) {
 		}
 	} else {
 		// Otherwise calculate remaining based on used count
-		freeOpsRemaining = constants.FreeOperationsMonthly - freeOpsUsed
+		freeOpsRemaining = constants.DEFAULT_FREE_OPERATIONS_MONTHLY - freeOpsUsed
 		if freeOpsRemaining < 0 {
 			freeOpsRemaining = 0
 		}
@@ -116,7 +116,7 @@ func GetUserProfile(c *gin.Context) {
 		"currentPeriodStart":      currentPeriodStart,
 		"currentPeriodEnd":        currentPeriodEnd,
 		"operations":              operations,
-		"limit":                   constants.FreeOperationsMonthly,
+		"limit":                   constants.DEFAULT_FREE_OPERATIONS_MONTHLY,
 		"balance":                 currentBalance,
 		"freeOperationsUsed":      freeOpsUsed,
 		"freeOperationsRemaining": freeOpsRemaining,

@@ -69,10 +69,10 @@ func (h *TrackUsageHandler) GetUsageStats(c *gin.Context) {
 	freeOpsRemaining := 0
 	if user.FreeOperationsReset.Before(now) {
 		// If reset date has passed, user has all free operations available
-		freeOpsRemaining = constants.FreeOperationsMonthly
+		freeOpsRemaining = constants.DEFAULT_FREE_OPERATIONS_MONTHLY
 	} else {
 		// Otherwise calculate remaining based on used count
-		freeOpsRemaining = constants.FreeOperationsMonthly - user.FreeOperationsUsed
+		freeOpsRemaining = constants.DEFAULT_FREE_OPERATIONS_MONTHLY - user.FreeOperationsUsed
 		if freeOpsRemaining < 0 {
 			freeOpsRemaining = 0
 		}
@@ -85,7 +85,7 @@ func (h *TrackUsageHandler) GetUsageStats(c *gin.Context) {
 		"operationCounts":         operationCounts,
 		"freeOperationsUsed":      user.FreeOperationsUsed,
 		"freeOperationsRemaining": freeOpsRemaining,
-		"freeOperationsTotal":     constants.FreeOperationsMonthly,
+		"freeOperationsTotal":     constants.DEFAULT_FREE_OPERATIONS_MONTHLY,
 		"nextResetDate":           user.FreeOperationsReset,
 		"period": gin.H{
 			"start": startOfMonth,

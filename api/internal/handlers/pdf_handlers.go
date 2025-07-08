@@ -79,7 +79,7 @@ func (h *PDFHandler) ConvertPDF(c *gin.Context) {
 			"details": gin.H{
 				"balance":                 result.CurrentBalance,
 				"freeOperationsRemaining": result.FreeOperationsRemaining,
-				"operationCost":           constants.OperationCost,
+				"operationCost":           constants.DEFAULT_OPERATION_COST,
 			},
 		})
 		return
@@ -198,7 +198,7 @@ func (h *PDFHandler) ConvertPDF(c *gin.Context) {
 			"usedFreeOperation":       result.UsedFreeOperation,
 			"freeOperationsRemaining": result.FreeOperationsRemaining,
 			"currentBalance":          result.CurrentBalance,
-			"operationCost":           constants.OperationCost,
+			"operationCost":           constants.DEFAULT_OPERATION_COST,
 		},
 	})
 }
@@ -743,7 +743,7 @@ func (h *PDFHandler) SplitPDF(c *gin.Context) {
 				"details": gin.H{
 					"balance":                 result.CurrentBalance,
 					"freeOperationsRemaining": result.FreeOperationsRemaining,
-					"operationCost":           constants.OperationCost,
+					"operationCost":           constants.DEFAULT_OPERATION_COST,
 				},
 			})
 			return
@@ -1841,7 +1841,7 @@ func (h *PDFHandler) WatermarkPDF(c *gin.Context) {
 				"details": gin.H{
 					"balance":                 result.CurrentBalance,
 					"freeOperationsRemaining": result.FreeOperationsRemaining,
-					"operationCost":           constants.OperationCost,
+					"operationCost":           constants.DEFAULT_OPERATION_COST,
 				},
 			})
 			return
@@ -2069,7 +2069,7 @@ func (h *PDFHandler) WatermarkPDF(c *gin.Context) {
 		if result.UsedFreeOperation {
 			opCost = 0
 		} else {
-			opCost = constants.OperationCost
+			opCost = constants.DEFAULT_OPERATION_COST
 		}
 		response["billing"] = gin.H{
 			"usedFreeOperation":       result.UsedFreeOperation,
@@ -2133,7 +2133,7 @@ func (h *PDFHandler) UnlockPDF(c *gin.Context) {
 			"details": gin.H{
 				"balance":                 result.CurrentBalance,
 				"freeOperationsRemaining": result.FreeOperationsRemaining,
-				"operationCost":           constants.OperationCost,
+				"operationCost":           constants.DEFAULT_OPERATION_COST,
 			},
 		})
 		return
@@ -2248,7 +2248,7 @@ func (h *PDFHandler) CompressPDF(c *gin.Context) {
 			"details": gin.H{
 				"balance":                 result.CurrentBalance,
 				"freeOperationsRemaining": result.FreeOperationsRemaining,
-				"operationCost":           constants.OperationCost,
+				"operationCost":           constants.DEFAULT_OPERATION_COST,
 			},
 		})
 		return
@@ -2594,7 +2594,7 @@ func (h *PDFHandler) ProtectPDF(c *gin.Context) {
 			"details": gin.H{
 				"balance":                 result.CurrentBalance,
 				"freeOperationsRemaining": result.FreeOperationsRemaining,
-				"operationCost":           constants.OperationCost,
+				"operationCost":           constants.DEFAULT_OPERATION_COST,
 			},
 		})
 		return
@@ -2713,7 +2713,7 @@ func (h *PDFHandler) ProtectPDF(c *gin.Context) {
 			"usedFreeOperation":       result.UsedFreeOperation,
 			"freeOperationsRemaining": result.FreeOperationsRemaining,
 			"currentBalance":          result.CurrentBalance,
-			"operationCost":           constants.OperationCost,
+			"operationCost":           constants.DEFAULT_OPERATION_COST,
 		},
 	})
 }
@@ -2752,7 +2752,7 @@ func (h *PDFHandler) MergePDFs(c *gin.Context) {
 			"details": gin.H{
 				"balance":                 result.CurrentBalance,
 				"freeOperationsRemaining": result.FreeOperationsRemaining,
-				"operationCost":           constants.OperationCost,
+				"operationCost":           constants.DEFAULT_OPERATION_COST,
 			},
 		})
 		return
@@ -3153,7 +3153,7 @@ func (h *PDFHandler) AddPageNumbersToPDF(c *gin.Context) {
 				"details": gin.H{
 					"balance":                 result.CurrentBalance,
 					"freeOperationsRemaining": result.FreeOperationsRemaining,
-					"operationCost":           constants.OperationCost,
+					"operationCost":           constants.DEFAULT_OPERATION_COST,
 				},
 			})
 			return
@@ -3450,7 +3450,7 @@ func (h *PDFHandler) AddPageNumbersToPDF(c *gin.Context) {
 		if result.UsedFreeOperation {
 			opCost = 0
 		} else {
-			opCost = constants.OperationCost
+			opCost = constants.DEFAULT_OPERATION_COST
 		}
 
 		response["billing"] = gin.H{
