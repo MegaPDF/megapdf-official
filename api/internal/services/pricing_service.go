@@ -12,7 +12,10 @@ import (
 
 // PricingService handles all pricing-related operations
 type PricingService struct {
-	pricingRepo *repository.PricingRepository
+	pricingRepo   *repository.PricingRepository
+	cachedPricing *models.CustomPricing
+	lastUpdate    time.Time
+	cacheTTL      time.Duration
 }
 
 // NewPricingService creates a new pricing service
@@ -72,7 +75,22 @@ func (s *PricingService) GetFreeOperationsLimit() int {
 
 // GetPricingSettings returns complete pricing configuration
 func (s *PricingService) GetPricingSettings() (*models.CustomPricing, error) {
-	return s.pricingRepo.GetPricingSettings()
+	// Check cache first (5-minute TTL)
+	if s.cachedPricing != nil && time.Since(s.lastUpdate) < 2*time.Minute {
+		return s.cachedPricing, nil
+	}
+
+	// Fetch from database
+	pricing, err := s.pricingRepo.GetPricingSettings()
+	if err != nil {
+		return nil, err
+	}
+
+	// Update cache
+	s.cachedPricing = pricing
+	s.lastUpdate = time.Now()
+
+	return pricing, nil
 }
 
 // UpdatePricingSettings saves new pricing configuration

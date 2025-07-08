@@ -1,492 +1,305 @@
-// Charts Component for Admin Panel
-// Simple chart implementation without external dependencies
-
+// Professional Charts Component using Chart.js
 class ChartComponent {
     constructor() {
         this.charts = new Map();
+        this.loadChartJS();
+    }
+
+    async loadChartJS() {
+        // Load Chart.js if not already loaded
+        if (typeof Chart === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js';
+            script.onload = () => {
+                console.log('Chart.js loaded successfully');
+            };
+            document.head.appendChild(script);
+        }
     }
 
     // Create a bar chart
     createBarChart(containerId, data, options = {}) {
-        const container = document.getElementById(containerId);
-        if (!container) return null;
-
-        const config = {
-            type: 'bar',
-            data: data,
-            width: options.width || 400,
-            height: options.height || 300,
-            colors: options.colors || ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'],
-            showValues: options.showValues !== false,
-            title: options.title || '',
-            ...options
-        };
-
-        const chart = this.renderBarChart(container, config);
-        this.charts.set(containerId, chart);
-        return chart;
+        return this.createChart(containerId, 'bar', data, options);
     }
 
     // Create a line chart
     createLineChart(containerId, data, options = {}) {
-        const container = document.getElementById(containerId);
-        if (!container) return null;
-
-        const config = {
-            type: 'line',
-            data: data,
-            width: options.width || 400,
-            height: options.height || 300,
-            colors: options.colors || ['#3B82F6', '#10B981', '#F59E0B'],
-            showPoints: options.showPoints !== false,
-            title: options.title || '',
-            ...options
-        };
-
-        const chart = this.renderLineChart(container, config);
-        this.charts.set(containerId, chart);
-        return chart;
+        return this.createChart(containerId, 'line', data, options);
     }
 
     // Create a doughnut chart
     createDoughnutChart(containerId, data, options = {}) {
-        const container = document.getElementById(containerId);
-        if (!container) return null;
-
-        const config = {
-            type: 'doughnut',
-            data: data,
-            width: options.width || 300,
-            height: options.height || 300,
-            colors: options.colors || ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
-            title: options.title || '',
-            ...options
-        };
-
-        const chart = this.renderDoughnutChart(container, config);
-        this.charts.set(containerId, chart);
-        return chart;
+        return this.createChart(containerId, 'doughnut', data, options);
     }
 
-    // Render bar chart
-    renderBarChart(container, config) {
-        const { data, width, height, colors, showValues, title } = config;
-        const labels = data.labels || [];
-        const datasets = data.datasets || [];
+    // Create a pie chart
+    createPieChart(containerId, data, options = {}) {
+        return this.createChart(containerId, 'pie', data, options);
+    }
 
-        if (datasets.length === 0) return null;
-
-        const svg = this.createSVG(width, height);
-        const chartArea = { x: 60, y: title ? 40 : 20, width: width - 100, height: height - 80 };
-
-        // Add title
-        if (title) {
-            const titleElement = this.createSVGElement('text', {
-                x: width / 2,
-                y: 20,
-                'text-anchor': 'middle',
-                'font-size': '16',
-                'font-weight': 'bold',
-                fill: '#374151'
-            });
-            titleElement.textContent = title;
-            svg.appendChild(titleElement);
+    // Generic chart creation method
+    createChart(containerId, type, data, options = {}) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.warn(`Chart container ${containerId} not found`);
+            return null;
         }
 
-        // Calculate max value
-        const maxValue = Math.max(...datasets.flatMap(d => d.data));
-        const yScale = chartArea.height / maxValue;
+        // Validate data
+        if (!data || !data.labels || !data.datasets) {
+            container.innerHTML = '<div class="flex items-center justify-center h-64 text-gray-500">No data available</div>';
+            return null;
+        }
 
-        // Draw bars
-        const barWidth = chartArea.width / (labels.length * datasets.length + labels.length);
-        const groupWidth = barWidth * datasets.length;
+        // Check if Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+            container.innerHTML = '<div class="flex items-center justify-center h-64 text-gray-500">Loading charts...</div>';
+            // Retry after a short delay
+            setTimeout(() => this.createChart(containerId, type, data, options), 500);
+            return null;
+        }
 
-        labels.forEach((label, labelIndex) => {
-            datasets.forEach((dataset, datasetIndex) => {
-                const value = dataset.data[labelIndex] || 0;
-                const barHeight = value * yScale;
-                const x = chartArea.x + labelIndex * (groupWidth + barWidth) + datasetIndex * barWidth;
-                const y = chartArea.y + chartArea.height - barHeight;
+        // Destroy existing chart if it exists
+        this.destroyChart(containerId);
 
-                // Draw bar
-                const rect = this.createSVGElement('rect', {
-                    x: x,
-                    y: y,
-                    width: barWidth - 2,
-                    height: barHeight,
-                    fill: colors[datasetIndex % colors.length],
-                    'fill-opacity': '0.8',
-                    class: 'chart-bar'
-                });
+        // Clear container and create canvas
+        container.innerHTML = '<canvas></canvas>';
+        const canvas = container.querySelector('canvas');
+        const ctx = canvas.getContext('2d');
 
-                // Add hover effect
-                rect.addEventListener('mouseenter', () => {
-                    rect.setAttribute('fill-opacity', '1');
-                    this.showTooltip(x + barWidth/2, y, `${label}: ${value}`);
-                });
+        // Default configuration
+        const defaultConfig = {
+            type: type,
+            data: data,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: 'white',
+                        bodyColor: 'white',
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        displayColors: true
+                    }
+                },
+                animation: {
+                    duration: 1000,
+                    easing: 'easeInOutQuart'
+                }
+            }
+        };
 
-                rect.addEventListener('mouseleave', () => {
-                    rect.setAttribute('fill-opacity', '0.8');
-                    this.hideTooltip();
-                });
+        // Merge custom options
+        const config = this.mergeConfig(defaultConfig, options, type);
 
-                svg.appendChild(rect);
+        try {
+            const chart = new Chart(ctx, config);
+            this.charts.set(containerId, chart);
+            return chart;
+        } catch (error) {
+            console.error('Error creating chart:', error);
+            container.innerHTML = '<div class="flex items-center justify-center h-64 text-red-500">Chart error</div>';
+            return null;
+        }
+    }
 
-                // Show values on bars
-                if (showValues) {
-                    const text = this.createSVGElement('text', {
-                        x: x + barWidth / 2,
-                        y: y - 5,
-                        'text-anchor': 'middle',
-                        'font-size': '12',
-                        fill: '#6B7280'
-                    });
-                    text.textContent = value;
-                    svg.appendChild(text);
+    // Merge configuration based on chart type
+    mergeConfig(defaultConfig, customOptions, type) {
+        const config = JSON.parse(JSON.stringify(defaultConfig)); // Deep clone
+
+        // Type-specific configurations
+        switch (type) {
+            case 'bar':
+                config.options.scales = {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return this.formatValue(value);
+                            }.bind(this)
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                };
+                break;
+
+            case 'line':
+                config.options.scales = {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                };
+                config.options.elements = {
+                    line: {
+                        tension: 0.4
+                    },
+                    point: {
+                        radius: 4,
+                        hoverRadius: 6
+                    }
+                };
+                break;
+
+            case 'doughnut':
+            case 'pie':
+                config.options.cutout = type === 'doughnut' ? '60%' : 0;
+                config.options.plugins.legend.position = 'right';
+                break;
+        }
+
+        // Merge custom options
+        return this.deepMerge(config, customOptions);
+    }
+
+    // Deep merge utility
+    deepMerge(target, source) {
+        const output = Object.assign({}, target);
+        if (this.isObject(target) && this.isObject(source)) {
+            Object.keys(source).forEach(key => {
+                if (this.isObject(source[key])) {
+                    if (!(key in target))
+                        Object.assign(output, { [key]: source[key] });
+                    else
+                        output[key] = this.deepMerge(target[key], source[key]);
+                } else {
+                    Object.assign(output, { [key]: source[key] });
                 }
             });
-
-            // Draw label
-            const labelText = this.createSVGElement('text', {
-                x: chartArea.x + labelIndex * (groupWidth + barWidth) + groupWidth / 2,
-                y: chartArea.y + chartArea.height + 20,
-                'text-anchor': 'middle',
-                'font-size': '12',
-                fill: '#6B7280'
-            });
-            labelText.textContent = label;
-            svg.appendChild(labelText);
-        });
-
-        // Draw Y axis
-        this.drawYAxis(svg, chartArea, maxValue);
-
-        container.innerHTML = '';
-        container.appendChild(svg);
-
-        return { svg, update: (newData) => this.updateBarChart(container, newData, config) };
-    }
-
-    // Render line chart
-    renderLineChart(container, config) {
-        const { data, width, height, colors, showPoints, title } = config;
-        const labels = data.labels || [];
-        const datasets = data.datasets || [];
-
-        if (datasets.length === 0) return null;
-
-        const svg = this.createSVG(width, height);
-        const chartArea = { x: 60, y: title ? 40 : 20, width: width - 100, height: height - 80 };
-
-        // Add title
-        if (title) {
-            const titleElement = this.createSVGElement('text', {
-                x: width / 2,
-                y: 20,
-                'text-anchor': 'middle',
-                'font-size': '16',
-                'font-weight': 'bold',
-                fill: '#374151'
-            });
-            titleElement.textContent = title;
-            svg.appendChild(titleElement);
         }
-
-        // Calculate scales
-        const maxValue = Math.max(...datasets.flatMap(d => d.data));
-        const xStep = chartArea.width / (labels.length - 1);
-        const yScale = chartArea.height / maxValue;
-
-        // Draw lines and points
-        datasets.forEach((dataset, datasetIndex) => {
-            const color = colors[datasetIndex % colors.length];
-            const points = dataset.data.map((value, index) => ({
-                x: chartArea.x + index * xStep,
-                y: chartArea.y + chartArea.height - (value * yScale)
-            }));
-
-            // Draw line
-            const pathData = points.map((point, index) => 
-                `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
-            ).join(' ');
-
-            const path = this.createSVGElement('path', {
-                d: pathData,
-                stroke: color,
-                'stroke-width': '2',
-                fill: 'none',
-                class: 'chart-line'
-            });
-            svg.appendChild(path);
-
-            // Draw points
-            if (showPoints) {
-                points.forEach((point, index) => {
-                    const circle = this.createSVGElement('circle', {
-                        cx: point.x,
-                        cy: point.y,
-                        r: '4',
-                        fill: color,
-                        class: 'chart-point'
-                    });
-
-                    // Add hover effect
-                    circle.addEventListener('mouseenter', () => {
-                        circle.setAttribute('r', '6');
-                        this.showTooltip(point.x, point.y, `${labels[index]}: ${dataset.data[index]}`);
-                    });
-
-                    circle.addEventListener('mouseleave', () => {
-                        circle.setAttribute('r', '4');
-                        this.hideTooltip();
-                    });
-
-                    svg.appendChild(circle);
-                });
-            }
-        });
-
-        // Draw labels
-        labels.forEach((label, index) => {
-            const x = chartArea.x + index * xStep;
-            const labelText = this.createSVGElement('text', {
-                x: x,
-                y: chartArea.y + chartArea.height + 20,
-                'text-anchor': 'middle',
-                'font-size': '12',
-                fill: '#6B7280'
-            });
-            labelText.textContent = label;
-            svg.appendChild(labelText);
-        });
-
-        // Draw Y axis
-        this.drawYAxis(svg, chartArea, maxValue);
-
-        container.innerHTML = '';
-        container.appendChild(svg);
-
-        return { svg, update: (newData) => this.updateLineChart(container, newData, config) };
+        return output;
     }
 
-    // Render doughnut chart
-    renderDoughnutChart(container, config) {
-        const { data, width, height, colors, title } = config;
-        const labels = data.labels || [];
-        const values = data.datasets?.[0]?.data || [];
-
-        if (values.length === 0) return null;
-
-        const svg = this.createSVG(width, height);
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const radius = Math.min(width, height) / 2 - 40;
-        const innerRadius = radius * 0.6;
-
-        // Add title
-        if (title) {
-            const titleElement = this.createSVGElement('text', {
-                x: centerX,
-                y: 20,
-                'text-anchor': 'middle',
-                'font-size': '16',
-                'font-weight': 'bold',
-                fill: '#374151'
-            });
-            titleElement.textContent = title;
-            svg.appendChild(titleElement);
-        }
-
-        // Calculate total and angles
-        const total = values.reduce((sum, value) => sum + value, 0);
-        let currentAngle = -Math.PI / 2; // Start at top
-
-        values.forEach((value, index) => {
-            const percentage = value / total;
-            const angle = percentage * 2 * Math.PI;
-            const endAngle = currentAngle + angle;
-
-            // Create arc path
-            const largeArcFlag = angle > Math.PI ? 1 : 0;
-            const outerStart = this.polarToCartesian(centerX, centerY, radius, currentAngle);
-            const outerEnd = this.polarToCartesian(centerX, centerY, radius, endAngle);
-            const innerStart = this.polarToCartesian(centerX, centerY, innerRadius, currentAngle);
-            const innerEnd = this.polarToCartesian(centerX, centerY, innerRadius, endAngle);
-
-            const pathData = [
-                'M', outerStart.x, outerStart.y,
-                'A', radius, radius, 0, largeArcFlag, 1, outerEnd.x, outerEnd.y,
-                'L', innerEnd.x, innerEnd.y,
-                'A', innerRadius, innerRadius, 0, largeArcFlag, 0, innerStart.x, innerStart.y,
-                'Z'
-            ].join(' ');
-
-            const path = this.createSVGElement('path', {
-                d: pathData,
-                fill: colors[index % colors.length],
-                'fill-opacity': '0.8',
-                class: 'chart-segment'
-            });
-
-            // Add hover effect
-            path.addEventListener('mouseenter', () => {
-                path.setAttribute('fill-opacity', '1');
-                const midAngle = currentAngle + angle / 2;
-                const tooltipPos = this.polarToCartesian(centerX, centerY, radius + 20, midAngle);
-                this.showTooltip(tooltipPos.x, tooltipPos.y, `${labels[index]}: ${value} (${(percentage * 100).toFixed(1)}%)`);
-            });
-
-            path.addEventListener('mouseleave', () => {
-                path.setAttribute('fill-opacity', '0.8');
-                this.hideTooltip();
-            });
-
-            svg.appendChild(path);
-            currentAngle = endAngle;
-        });
-
-        // Add legend
-        this.addLegend(svg, labels, colors, width, height);
-
-        container.innerHTML = '';
-        container.appendChild(svg);
-
-        return { svg, update: (newData) => this.updateDoughnutChart(container, newData, config) };
+    isObject(item) {
+        return item && typeof item === 'object' && !Array.isArray(item);
     }
 
-    // Helper methods
-    createSVG(width, height) {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('width', width);
-        svg.setAttribute('height', height);
-        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-        svg.style.backgroundColor = 'transparent';
-        return svg;
-    }
-
-    createSVGElement(tag, attributes) {
-        const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
-        Object.entries(attributes).forEach(([key, value]) => {
-            element.setAttribute(key, value);
-        });
-        return element;
-    }
-
-    drawYAxis(svg, chartArea, maxValue) {
-        const steps = 5;
-        const stepValue = maxValue / steps;
-
-        for (let i = 0; i <= steps; i++) {
-            const y = chartArea.y + chartArea.height - (i * chartArea.height / steps);
-            const value = Math.round(i * stepValue);
-
-            // Grid line
-            const line = this.createSVGElement('line', {
-                x1: chartArea.x,
-                y1: y,
-                x2: chartArea.x + chartArea.width,
-                y2: y,
-                stroke: '#E5E7EB',
-                'stroke-width': '1'
-            });
-            svg.appendChild(line);
-
-            // Y label
-            const text = this.createSVGElement('text', {
-                x: chartArea.x - 10,
-                y: y + 5,
-                'text-anchor': 'end',
-                'font-size': '12',
-                fill: '#6B7280'
-            });
-            text.textContent = value;
-            svg.appendChild(text);
+    // Update existing chart
+    updateChart(containerId, newData) {
+        const chart = this.charts.get(containerId);
+        if (chart) {
+            chart.data = newData;
+            chart.update('active');
         }
     }
 
-    polarToCartesian(centerX, centerY, radius, angleInRadians) {
-        return {
-            x: centerX + (radius * Math.cos(angleInRadians)),
-            y: centerY + (radius * Math.sin(angleInRadians))
-        };
-    }
-
-    addLegend(svg, labels, colors, width, height) {
-        const legendX = 20;
-        const legendY = height - (labels.length * 20 + 20);
-
-        labels.forEach((label, index) => {
-            const y = legendY + index * 20;
-
-            // Color box
-            const rect = this.createSVGElement('rect', {
-                x: legendX,
-                y: y,
-                width: 12,
-                height: 12,
-                fill: colors[index % colors.length]
-            });
-            svg.appendChild(rect);
-
-            // Label text
-            const text = this.createSVGElement('text', {
-                x: legendX + 20,
-                y: y + 9,
-                'font-size': '12',
-                fill: '#374151'
-            });
-            text.textContent = label;
-            svg.appendChild(text);
-        });
-    }
-
-    showTooltip(x, y, text) {
-        this.hideTooltip(); // Remove existing tooltip
-
-        const tooltip = document.createElement('div');
-        tooltip.id = 'chart-tooltip';
-        tooltip.className = 'absolute bg-gray-800 text-white px-2 py-1 rounded text-sm pointer-events-none z-50';
-        tooltip.textContent = text;
-        tooltip.style.left = `${x}px`;
-        tooltip.style.top = `${y - 30}px`;
-        tooltip.style.transform = 'translateX(-50%)';
-
-        document.body.appendChild(tooltip);
-    }
-
-    hideTooltip() {
-        const existing = document.getElementById('chart-tooltip');
-        if (existing) {
-            existing.remove();
-        }
-    }
-
-    // Update methods
+    // Update specific chart types
     updateBarChart(container, newData, config) {
-        this.renderBarChart(container, { ...config, data: newData });
+        const containerId = typeof container === 'string' ? container : container.id;
+        if (this.charts.has(containerId)) {
+            this.updateChart(containerId, newData);
+        } else {
+            this.createBarChart(containerId, newData, config);
+        }
     }
 
     updateLineChart(container, newData, config) {
-        this.renderLineChart(container, { ...config, data: newData });
+        const containerId = typeof container === 'string' ? container : container.id;
+        if (this.charts.has(containerId)) {
+            this.updateChart(containerId, newData);
+        } else {
+            this.createLineChart(containerId, newData, config);
+        }
     }
 
     updateDoughnutChart(container, newData, config) {
-        this.renderDoughnutChart(container, { ...config, data: newData });
+        const containerId = typeof container === 'string' ? container : container.id;
+        if (this.charts.has(containerId)) {
+            this.updateChart(containerId, newData);
+        } else {
+            this.createDoughnutChart(containerId, newData, config);
+        }
     }
 
-    // Destroy chart
-    destroy(containerId) {
+    // Render methods (for backward compatibility)
+    renderBarChart(container, config) {
+        const containerId = typeof container === 'string' ? container : container.id;
+        return this.createBarChart(containerId, config.data, config);
+    }
+
+    renderLineChart(container, config) {
+        const containerId = typeof container === 'string' ? container : container.id;
+        return this.createLineChart(containerId, config.data, config);
+    }
+
+    renderDoughnutChart(container, config) {
+        const containerId = typeof container === 'string' ? container : container.id;
+        return this.createDoughnutChart(containerId, config.data, config);
+    }
+
+    // Utility methods
+    formatValue(value) {
+        if (typeof value !== 'number') return '0';
+        
+        if (value >= 1000000) {
+            return (value / 1000000).toFixed(1) + 'M';
+        } else if (value >= 1000) {
+            return (value / 1000).toFixed(1) + 'K';
+        } else if (value % 1 === 0) {
+            return value.toString();
+        } else {
+            return value.toFixed(2);
+        }
+    }
+
+    // Generate color palette
+    generateColors(count) {
+        const colors = [
+            '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+            '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6366F1'
+        ];
+        
+        if (count <= colors.length) {
+            return colors.slice(0, count);
+        }
+        
+        // Generate additional colors if needed
+        const additionalColors = [];
+        for (let i = colors.length; i < count; i++) {
+            const hue = (i * 137.5) % 360; // Golden angle for good color distribution
+            additionalColors.push(`hsl(${hue}, 70%, 60%)`);
+        }
+        
+        return [...colors, ...additionalColors];
+    }
+
+    // Destroy specific chart
+    destroyChart(containerId) {
         const chart = this.charts.get(containerId);
         if (chart) {
+            chart.destroy();
             this.charts.delete(containerId);
         }
-        this.hideTooltip();
     }
 
     // Destroy all charts
     destroyAll() {
+        this.charts.forEach(chart => chart.destroy());
         this.charts.clear();
-        this.hideTooltip();
     }
 }
 

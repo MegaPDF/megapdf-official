@@ -729,7 +729,7 @@ func (h *PDFHandler) SplitPDF(c *gin.Context) {
 
 	// IMPORTANT: Check if the user can perform this operation BEFORE processing
 	if exists {
-		result, err := h.balanceService.ProcessOperation(userID.(string), "Split")
+		result, err := h.balanceService.ProcessOperation(userID.(string), "split")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "Failed to process operation: " + err.Error(),
@@ -1825,7 +1825,7 @@ func (h *PDFHandler) WatermarkPDF(c *gin.Context) {
 	// Process the operation charge
 	if exists {
 		log.Printf("Processing watermark operation for userID: %s", userID)
-		result, err := h.balanceService.ProcessOperation(userID.(string), "Watermark")
+		result, err := h.balanceService.ProcessOperation(userID.(string), "watermark")
 		if err != nil {
 			log.Printf("Balance service error for user %s: %v", userID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -2118,7 +2118,7 @@ func (h *PDFHandler) UnlockPDF(c *gin.Context) {
 	userID, _ := c.Get("userId")
 
 	// Process the operation charge
-	result, err := h.balanceService.ProcessOperation(userID.(string), "Unlock")
+	result, err := h.balanceService.ProcessOperation(userID.(string), "unlock")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to process operation: " + err.Error(),
@@ -2233,7 +2233,7 @@ func (h *PDFHandler) CompressPDF(c *gin.Context) {
 	userID, _ := c.Get("userId")
 
 	// Process the operation charge
-	result, err := h.balanceService.ProcessOperation(userID.(string), "Compress")
+	result, err := h.balanceService.ProcessOperation(userID.(string), "compress")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to process operation: " + err.Error(),
@@ -2578,7 +2578,7 @@ func (h *PDFHandler) ProtectPDF(c *gin.Context) {
 	}
 
 	// Process the operation charge
-	result, err := h.balanceService.ProcessOperation(userIDStr, "Protect")
+	result, err := h.balanceService.ProcessOperation(userIDStr, "protect")
 	if err != nil {
 		log.Printf("Balance service error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -2737,7 +2737,7 @@ func (h *PDFHandler) MergePDFs(c *gin.Context) {
 	userID, _ := c.Get("userId")
 
 	// Process the operation charge
-	result, err := h.balanceService.ProcessOperation(userID.(string), "Merge")
+	result, err := h.balanceService.ProcessOperation(userID.(string), "merge")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to process operation: " + err.Error(),
@@ -2916,7 +2916,7 @@ func (h *PDFHandler) RemovePagesFromPDF(c *gin.Context) {
 
 	// Process the operation charge if user is authenticated
 	if exists && userID != nil {
-		result, err := h.balanceService.ProcessOperation(userID.(string), "Remove")
+		result, err := h.balanceService.ProcessOperation(userID.(string), "remove")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "Failed to process operation: " + err.Error(),
@@ -3138,7 +3138,7 @@ func (h *PDFHandler) AddPageNumbersToPDF(c *gin.Context) {
 
 	// Process the operation charge
 	if exists {
-		result, err := h.balanceService.ProcessOperation(userID.(string), "AddPageNumbers")
+		result, err := h.balanceService.ProcessOperation(userID.(string), "addPageNumbers")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "Failed to process operation: " + err.Error(),

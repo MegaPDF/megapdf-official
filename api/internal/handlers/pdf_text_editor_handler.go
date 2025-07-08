@@ -106,7 +106,7 @@ func (h *PDFTextEditorHandler) ExtractTextToPDF(c *gin.Context) {
 	// Get user ID and process billing
 	userID, exists := c.Get("userId")
 	if exists && userID != nil {
-		result, err := h.balanceService.ProcessOperation(userID.(string), "ExtractText")
+		result, err := h.balanceService.ProcessOperation(userID.(string), "extractText")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "Failed to process operation: " + err.Error(),
@@ -228,7 +228,7 @@ func (h *PDFTextEditorHandler) ExtractTextToPDF(c *gin.Context) {
 
 	// Add billing info if available
 	if exists && userID != nil {
-		result, _ := h.balanceService.ProcessOperation(userID.(string), "ExtractText")
+		result, _ := h.balanceService.ProcessOperation(userID.(string), "extractText")
 		response["billing"] = gin.H{
 			"usedFreeOperation":       result.UsedFreeOperation,
 			"freeOperationsRemaining": result.FreeOperationsRemaining,
@@ -245,7 +245,7 @@ func (h *PDFTextEditorHandler) SaveEditedPDF(c *gin.Context) {
 	// Get user ID and process billing
 	userID, exists := c.Get("userId")
 	if exists && userID != nil {
-		result, err := h.balanceService.ProcessOperation(userID.(string), "SaveEditedText")
+		result, err := h.balanceService.ProcessOperation(userID.(string), "saveEditedText")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "Failed to process operation: " + err.Error(),
@@ -322,7 +322,7 @@ func (h *PDFTextEditorHandler) SaveEditedPDF(c *gin.Context) {
 
 	// Add billing info if available
 	if exists && userID != nil {
-		result, _ := h.balanceService.ProcessOperation(userID.(string), "SaveEditedText")
+		result, _ := h.balanceService.ProcessOperation(userID.(string), "saveEditedText")
 		response["billing"] = gin.H{
 			"usedFreeOperation":       result.UsedFreeOperation,
 			"freeOperationsRemaining": result.FreeOperationsRemaining,

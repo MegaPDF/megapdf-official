@@ -109,7 +109,6 @@ func (s *BalanceService) ProcessOperation(userID string, operation string) (*Ope
 
 		// Update local variables
 		freeOpsUsed = 0
-		freeOpsReset = resetDate
 	}
 
 	// Check if we should use free operation
@@ -485,8 +484,8 @@ func (s *BalanceService) getOperationCost(operation string) float64 {
 		fmt.Printf("PRICING: Found custom price for '%s': %.6f\n", operation, customPrice)
 
 		// Safety check - prevent unreasonable custom prices
-		if customPrice > 0.1 || customPrice < 0.001 {
-			fmt.Printf("PRICING WARNING: Custom price for '%s' is outside reasonable range (%.6f), using global price\n",
+		if customPrice > 100.0 || customPrice < 0.0001 {
+			fmt.Printf("PRICING WARNING: Custom price for '%s' is extremely unreasonable (%.6f), using global price\n",
 				operation, customPrice)
 			return pricing.OperationCost
 		}

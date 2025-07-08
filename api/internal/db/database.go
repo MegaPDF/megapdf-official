@@ -129,8 +129,8 @@ func InitDB() (*gorm.DB, error) {
 	}
 
 	// SQLite connection pool settings (more conservative than MySQL)
-	sqlDB.SetMaxIdleConns(1)
-	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(5)  // Increase from 1 to 5
+	sqlDB.SetMaxOpenConns(10) // Increase from 1 to 10
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	// IMPORTANT: Auto-migrate FIRST to create tables
