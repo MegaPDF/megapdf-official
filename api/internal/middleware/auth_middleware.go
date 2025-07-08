@@ -1,4 +1,3 @@
-// internal/middleware/auth_middleware.go - Simplified with environment variables only
 package middleware
 
 import (
@@ -62,8 +61,14 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			}
 		}
 
+		// Safely truncate user agent for logging
+		userAgentTruncated := userAgent
+		if len(userAgent) > 50 {
+			userAgentTruncated = userAgent[:50]
+		}
+
 		fmt.Printf("[AUTH] Token source: %s, Has token: %v, User-Agent: %s\n",
-			authSource, token != "", userAgent[:min(50, len(userAgent))])
+			authSource, token != "", userAgentTruncated)
 
 		if token == "" {
 			fmt.Printf("[AUTH] FAILED - No token provided for %s from %s\n", requestPath, clientIP)
@@ -144,8 +149,9 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		fmt.Printf("[AUTH] SUCCESS - User %s (%s, role: %s) authenticated for %s from %s\n",
 			userID, user.Email, user.Role, requestPath, clientIP)
 
-		// Store user information in context
-		c.Set("userId", userID)
+		// Store user information in context - FIXED: Use consistent key names
+		c.Set("userID", userID) // Use userID (matches admin handler expectation)
+		c.Set("userId", userID) // Also set userId for backward compatibility
 		c.Set("userEmail", user.Email)
 		c.Set("userRole", user.Role)
 		c.Set("authSource", authSource)

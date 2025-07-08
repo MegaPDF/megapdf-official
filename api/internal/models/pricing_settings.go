@@ -11,7 +11,7 @@ import (
 type PricingSetting struct {
 	ID          string `gorm:"primaryKey;type:varchar(100)"`
 	Key         string `gorm:"uniqueIndex;type:varchar(255)"`
-	Value       string `gorm:"type:json"` // Using JSON type for MySQL
+	Value       string `gorm:"type:json"` // Using JSON type for SQLite
 	Description string `gorm:"type:text"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time

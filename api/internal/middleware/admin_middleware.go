@@ -1,33 +1,18 @@
-// internal/middleware/admin_middleware.go
 package middleware
 
 import (
 	"net/http"
 	"strings"
 
+	"github.com/MegaPDF/megapdf-official/api/internal/db"
 	"github.com/MegaPDF/megapdf-official/api/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"gorm.io/gorm"
 )
 
 // AdminMiddleware ensures only admin users can access admin routes
 func AdminMiddleware(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get database from context or use global DB
-		db, exists := c.Get("db")
-		if !exists {
-			// Import db package to use global DB
-			// This avoids circular import
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Database connection not available",
-			})
-			c.Abort()
-			return
-		}
-
-		database := db.(*gorm.DB)
-
 		// Get token from header or cookie
 		var tokenString string
 
@@ -82,9 +67,9 @@ func AdminMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		// Get user from database
+		// Get user from database using global DB connection
 		var user models.User
-		if err := database.Where("id = ?", userID).First(&user).Error; err != nil {
+		if err := db.DB.Where("id = ?", userID).First(&user).Error; err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "User not found",
 			})
@@ -101,8 +86,8 @@ func AdminMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		// Set user in context
-		c.Set("userID", userID)
+		// Set user in context with the correct key names to match what the handler expects
+		c.Set("userID", userID) // Note: userID not userId
 		c.Set("userRole", user.Role)
 		c.Set("user", user)
 

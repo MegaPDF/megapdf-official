@@ -194,13 +194,7 @@ export function UsageStats({ user, usageStats }: UsageStatsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              $
-              {user.balance.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
+            <div className="text-2xl font-bold">${user.balance}</div>
 
             <p className="text-xs text-muted-foreground">
               {t("balancePanel.title.operationsCoverage") || "Covers"}{" "}

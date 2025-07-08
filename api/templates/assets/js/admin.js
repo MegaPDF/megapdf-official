@@ -7,6 +7,7 @@ class AdminApp {
         this.components = {
             dashboard: DashboardComponent,
             users: UsersComponent,
+            analytics: AnalyticsComponent,
             settings: SettingsComponent,
             pricing: PricingComponent,
             tools: ToolsComponent

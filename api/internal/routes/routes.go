@@ -259,6 +259,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			keys.DELETE("/:id", apiKeyHandler.RevokeKey)
 		}
 		admin := api.Group("/admin")
+		// First apply auth middleware, then admin middleware
+		admin.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		admin.Use(middleware.AdminMiddleware(cfg.JWTSecret))
 		{
 			// Dashboard
