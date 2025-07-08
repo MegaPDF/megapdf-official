@@ -1,16 +1,16 @@
-version: '3'
+version: "3"
 
 services:
   frontend:
     build:
-      context: ./app  # Points to the Next.js app directory
+      context: ./app # Points to the Next.js app directory
       dockerfile: Dockerfile
     container_name: megapdf:latest
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://api:8080  # Points to the API service
+      - NEXT_PUBLIC_API_URL=http://api:8080 # Points to the API service
     restart: unless-stopped
     depends_on:
       - api
@@ -18,7 +18,7 @@ services:
 
   api:
     build:
-      context: ./api  # Points to the Go API directory
+      context: ./api # Points to the Go API directory
       dockerfile: Dockerfile
     container_name: megaapi
     ports:
@@ -31,9 +31,9 @@ services:
       - PUBLIC_DIR=/api/public
       - DATABASE_PATH=/api/data/megapdf.db
     volumes:
-      - megapdf_data:/api/data       # Persistent database storage
+      - megapdf_data:/api/data # Persistent database storage
       - megapdf_uploads:/api/uploads # Persistent file uploads
-      - megapdf_public:/api/public   # Persistent processed files
+      - megapdf_public:/api/public # Persistent processed files
     restart: unless-stopped
     # No need to set workdir here as it's already defined in the Dockerfile as /api
 

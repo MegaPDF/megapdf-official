@@ -3,14 +3,19 @@ package handlers
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MegaPDF/megapdf-official/api/internal/config"
 	"github.com/MegaPDF/megapdf-official/api/internal/models"
 	"github.com/MegaPDF/megapdf-official/api/internal/services"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -101,6 +106,84 @@ func (h *AdminHandler) GetSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"settings": settings})
+}
+
+// @Summary Upload branding image
+// @Description Upload logo, favicon, or app icon for branding
+// @Tags admin
+// @Security BearerAuth
+// @Accept multipart/form-data
+// @Produce json
+// @Param image formData file true "Image file"
+// @Param type formData string true "Image type: logo, favicon, or icon"
+// @Success 200 {object} object{success=bool,url=string,message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 401 {object} object{error=string}
+// @Failure 413 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /api/admin/branding/upload [post]
+func (h *AdminHandler) UploadBrandingImage(c *gin.Context) {
+	file, header, err := c.Request.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
+		return
+	}
+	defer file.Close()
+
+	imageType := c.PostForm("type")
+	if imageType == "" {
+		imageType = "logo"
+	}
+
+	// Validate file size (max 2MB)
+	const maxSize = 2 * 1024 * 1024
+	if header.Size > maxSize {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "File too large. Maximum size is 2MB"})
+		return
+	}
+
+	// Validate file type
+	allowedExtensions := []string{".jpg", ".jpeg", ".png", ".gif", ".svg", ".ico"}
+	fileExt := strings.ToLower(filepath.Ext(header.Filename))
+	isValidExt := false
+	for _, ext := range allowedExtensions {
+		if fileExt == ext {
+			isValidExt = true
+			break
+		}
+	}
+	if !isValidExt {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file type"})
+		return
+	}
+
+	// Create uploads directory
+	uploadDir := filepath.Join("public", "uploads", "branding")
+	os.MkdirAll(uploadDir, 0755)
+
+	// Generate unique filename
+	timestamp := time.Now().Format("20060102-150405")
+	uuid := uuid.New().String()[:8]
+	filename := fmt.Sprintf("%s-%s-%s%s", imageType, timestamp, uuid, fileExt)
+	filePath := filepath.Join(uploadDir, filename)
+
+	// Save file
+	out, err := os.Create(filePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create file"})
+		return
+	}
+	defer out.Close()
+
+	io.Copy(out, file)
+
+	// Return success
+	publicURL := fmt.Sprintf("/uploads/branding/%s", filename)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"url":     publicURL,
+		"message": fmt.Sprintf("%s uploaded successfully", strings.Title(imageType)),
+	})
 }
 
 // @Summary Get branding settings

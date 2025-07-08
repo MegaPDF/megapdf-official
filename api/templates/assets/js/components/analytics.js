@@ -1,9 +1,8 @@
-// Analytics Component for Admin Panel
+// Analytics Component - Using Real Data
 class AnalyticsComponent {
     constructor() {
         this.analyticsData = null;
-        this.charts = {};
-        this.currentDateRange = '7d';
+        this.currentView = 'operations';
     }
 
     async render() {
@@ -17,33 +16,35 @@ class AnalyticsComponent {
     }
 
     createAnalyticsHTML() {
+        const stats = this.analyticsData.stats;
+        
         return `
             <div class="page-transition">
                 <!-- Page Header -->
-                <div class="flex items-center justify-between mb-8">
-                    <div>
-                        <h1 class="text-3xl font-bold text-gray-900">Analytics</h1>
-                        <p class="text-gray-600">Detailed insights and performance metrics</p>
-                    </div>
-                    <div class="flex items-center space-x-3">
-                        <select id="date-range-selector" onchange="window.analyticsComponent.changeTimeRange(this.value)" 
-                                class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="7d">Last 7 days</option>
-                            <option value="30d">Last 30 days</option>
-                            <option value="90d">Last 90 days</option>
-                            <option value="1y">Last year</option>
-                        </select>
-                        <button onclick="window.analyticsComponent.exportData()" 
-                                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                            <i class="fas fa-download mr-2"></i>
-                            Export Data
-                        </button>
+                <div class="mb-8">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-900">Analytics</h1>
+                            <p class="text-gray-600">Detailed insights into your system performance</p>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button onclick="window.analyticsComponent.exportData()" 
+                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                                <i class="fas fa-download mr-2"></i>
+                                Export Data
+                            </button>
+                            <button onclick="window.analyticsComponent.refreshAnalytics()" 
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-sync mr-2"></i>
+                                Refresh
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Key Metrics -->
+                <!-- Metrics Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    ${this.createMetricsCards()}
+                    ${this.createMetricsCards(stats)}
                 </div>
 
                 <!-- Charts Row -->
@@ -54,9 +55,9 @@ class AnalyticsComponent {
                             <h3 class="text-lg font-semibold text-gray-900">Usage Trends</h3>
                             <div class="flex space-x-2">
                                 <button onclick="window.analyticsComponent.switchChartView('operations')" 
-                                        class="chart-view-btn active" data-view="operations">Operations</button>
-                                <button onclick="window.analyticsComponent.switchChartView('users')" 
-                                        class="chart-view-btn" data-view="users">Users</button>
+                                        class="chart-view-btn ${this.currentView === 'operations' ? 'active' : ''}" data-view="operations">Operations</button>
+                                <button onclick="window.analyticsComponent.switchChartView('revenue')" 
+                                        class="chart-view-btn ${this.currentView === 'revenue' ? 'active' : ''}" data-view="revenue">Revenue</button>
                             </div>
                         </div>
                         <div id="usage-trends-chart" class="chart-container h-64"></div>
@@ -73,13 +74,27 @@ class AnalyticsComponent {
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                     <div class="lg:col-span-2 bg-white rounded-lg shadow p-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-6">Revenue Analytics</h3>
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <div class="text-center p-4 bg-green-50 rounded-lg">
+                                <div class="text-2xl font-bold text-green-600">$${this.formatCurrency(stats.totalRevenue)}</div>
+                                <div class="text-sm text-gray-500">Total Revenue</div>
+                            </div>
+                            <div class="text-center p-4 bg-blue-50 rounded-lg">
+                                <div class="text-2xl font-bold text-blue-600">$${this.formatCurrency(stats.revenueThisWeek)}</div>
+                                <div class="text-sm text-gray-500">This Week</div>
+                            </div>
+                            <div class="text-center p-4 bg-purple-50 rounded-lg">
+                                <div class="text-2xl font-bold text-purple-600">$${this.formatCurrency(stats.revenueToday)}</div>
+                                <div class="text-sm text-gray-500">Today</div>
+                            </div>
+                        </div>
                         <div id="revenue-chart" class="chart-container h-64"></div>
                     </div>
                     
                     <div class="bg-white rounded-lg shadow p-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-6">Top Revenue Sources</h3>
                         <div class="space-y-4">
-                            ${this.createRevenueSourcesList()}
+                            ${this.createRevenueSourcesList(stats.topOperations)}
                         </div>
                     </div>
                 </div>
@@ -87,159 +102,440 @@ class AnalyticsComponent {
                 <!-- User Behavior Analytics -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-6">User Activity Patterns</h3>
-                        <div id="user-activity-chart" class="chart-container h-64"></div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-6">User Activity Overview</h3>
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="text-center p-4 bg-blue-50 rounded-lg">
+                                <div class="text-2xl font-bold text-blue-600">${this.formatNumber(stats.totalUsers)}</div>
+                                <div class="text-sm text-gray-500">Total Users</div>
+                            </div>
+                            <div class="text-center p-4 bg-green-50 rounded-lg">
+                                <div class="text-2xl font-bold text-green-600">${this.formatNumber(stats.activeUsers)}</div>
+                                <div class="text-sm text-gray-500">Active Users</div>
+                            </div>
+                        </div>
+                        <div id="user-activity-chart" class="chart-container h-48"></div>
                     </div>
                     
                     <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-6">Peak Usage Hours</h3>
-                        <div id="peak-hours-chart" class="chart-container h-64"></div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-6">Performance Metrics</h3>
+                        <div class="space-y-4">
+                            ${this.createPerformanceMetrics(stats)}
+                        </div>
                     </div>
                 </div>
 
-                <!-- Performance Metrics -->
+                <!-- Detailed Operations Table -->
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="flex items-center justify-between mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900">Performance Metrics</h3>
-                        <button onclick="window.analyticsComponent.refreshMetrics()" 
-                                class="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                            <i class="fas fa-sync mr-1"></i>
-                            Refresh
-                        </button>
+                        <h3 class="text-lg font-semibold text-gray-900">Detailed Operations Analysis</h3>
+                        <span class="text-sm text-gray-500">${stats.topOperations?.length || 0} operation types</span>
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        ${this.createPerformanceMetrics()}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Operation</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Revenue</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Share</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${this.createOperationsTableRows(stats.topOperations, stats.totalOperations)}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         `;
     }
 
-    createMetricsCards() {
-        const stats = this.analyticsData?.stats || {};
+    createMetricsCards(stats) {
         const metrics = [
             {
                 title: 'Total Operations',
-                value: window.utils.formatNumber(stats.totalOperations || 0),
-                change: '+12.5%',
-                changeType: 'positive',
-                icon: 'fas fa-file-pdf',
-                color: 'blue'
-            },
-            {
-                title: 'Active Users',
-                value: window.utils.formatNumber(stats.activeUsers || 0),
-                change: '+8.2%',
-                changeType: 'positive',
-                icon: 'fas fa-users',
-                color: 'green'
+                value: this.formatNumber(stats.totalOperations),
+                change: stats.operationsToday > 0 ? `+${this.formatNumber(stats.operationsToday)} today` : 'No operations today',
+                icon: 'fas fa-chart-line',
+                color: 'blue',
+                trend: stats.operationsToday > 0 ? 'up' : 'neutral'
             },
             {
                 title: 'Revenue',
-                value: window.utils.formatCurrency(stats.totalRevenue || 0),
-                change: '+15.3%',
-                changeType: 'positive',
+                value: `$${this.formatCurrency(stats.totalRevenue)}`,
+                change: stats.revenueToday > 0 ? `+$${this.formatCurrency(stats.revenueToday)} today` : 'No revenue today',
                 icon: 'fas fa-dollar-sign',
-                color: 'purple'
+                color: 'green',
+                trend: stats.revenueToday > 0 ? 'up' : 'neutral'
             },
             {
-                title: 'Conversion Rate',
-                value: '3.2%',
-                change: '-0.5%',
-                changeType: 'negative',
-                icon: 'fas fa-percentage',
-                color: 'orange'
+                title: 'Active Users',
+                value: this.formatNumber(stats.activeUsers),
+                change: `${((stats.activeUsers / Math.max(stats.totalUsers, 1)) * 100).toFixed(1)}% of total`,
+                icon: 'fas fa-users',
+                color: 'purple',
+                trend: stats.activeUsers > 0 ? 'up' : 'neutral'
+            },
+            {
+                title: 'Avg Revenue/Operation',
+                value: `$${stats.totalOperations > 0 ? (stats.totalRevenue / stats.totalOperations).toFixed(3) : '0.000'}`,
+                change: 'Per operation',
+                icon: 'fas fa-calculator',
+                color: 'yellow',
+                trend: 'neutral'
             }
         ];
 
-        return metrics.map(metric => `
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="flex items-center justify-center h-12 w-12 rounded-md bg-${metric.color}-500 text-white">
-                            <i class="${metric.icon}"></i>
+        return metrics.map(metric => {
+            const colorClasses = {
+                blue: 'border-blue-500 bg-blue-50',
+                green: 'border-green-500 bg-green-50',
+                purple: 'border-purple-500 bg-purple-50',
+                yellow: 'border-yellow-500 bg-yellow-50'
+            };
+
+            const iconColors = {
+                blue: 'text-blue-600',
+                green: 'text-green-600',
+                purple: 'text-purple-600',
+                yellow: 'text-yellow-600'
+            };
+
+            return `
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 ${colorClasses[metric.color]}">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-600">${metric.title}</p>
+                            <p class="text-2xl font-bold text-gray-900">${metric.value}</p>
+                            <p class="text-sm text-gray-500 mt-1">${metric.change}</p>
                         </div>
-                    </div>
-                    <div class="ml-4">
-                        <div class="text-sm font-medium text-gray-500">${metric.title}</div>
-                        <div class="text-2xl font-bold text-gray-900">${metric.value}</div>
-                        <div class="flex items-center mt-1">
-                            <span class="text-sm ${metric.changeType === 'positive' ? 'text-green-600' : 'text-red-600'}">
-                                <i class="fas fa-arrow-${metric.changeType === 'positive' ? 'up' : 'down'} mr-1"></i>
-                                ${metric.change}
-                            </span>
-                            <span class="text-sm text-gray-500 ml-2">vs last period</span>
+                        <div class="w-12 h-12 rounded-lg flex items-center justify-center ${colorClasses[metric.color]}">
+                            <i class="${metric.icon} ${iconColors[metric.color]}"></i>
                         </div>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
-    createRevenueSourcesList() {
-        const sources = [
-            { name: 'PDF Compression', revenue: 2450, percentage: 35 },
-            { name: 'PDF Merge', revenue: 1890, percentage: 27 },
-            { name: 'PDF Split', revenue: 1230, percentage: 18 },
-            { name: 'PDF Protection', revenue: 890, percentage: 13 },
-            { name: 'Other Operations', revenue: 490, percentage: 7 }
-        ];
+    createRevenueSourcesList(operations) {
+        if (!operations || operations.length === 0) {
+            return '<div class="text-gray-500 text-center py-4">No revenue data available</div>';
+        }
 
-        return sources.map(source => `
-            <div class="flex items-center justify-between">
-                <div class="flex-1">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-sm font-medium text-gray-900">${source.name}</span>
-                        <span class="text-sm text-gray-600">${window.utils.formatCurrency(source.revenue)}</span>
+        const totalRevenue = operations.reduce((sum, op) => sum + (op.revenue || 0), 0);
+
+        return operations.slice(0, 5).map(op => {
+            const percentage = totalRevenue > 0 ? ((op.revenue || 0) / totalRevenue * 100) : 0;
+            
+            return `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span class="font-medium text-gray-900">${this.formatOperationName(op.operation)}</span>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-blue-500 h-2 rounded-full transition-all duration-500" 
-                             style="width: ${source.percentage}%"></div>
+                    <div class="text-right">
+                        <div class="font-semibold text-gray-900">$${this.formatCurrency(op.revenue || 0)}</div>
+                        <div class="text-sm text-gray-500">${percentage.toFixed(1)}%</div>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
-    createPerformanceMetrics() {
+    createPerformanceMetrics(stats) {
         const metrics = [
             {
-                title: 'Average Response Time',
-                value: '125ms',
-                status: 'good',
-                description: 'API response time'
+                label: 'Operations Today',
+                value: this.formatNumber(stats.operationsToday),
+                target: this.formatNumber(stats.operationsThisWeek / 7), // Daily average
+                percentage: stats.operationsThisWeek > 0 ? (stats.operationsToday / (stats.operationsThisWeek / 7) * 100) : 0
             },
             {
-                title: 'Success Rate',
-                value: '99.8%',
-                status: 'excellent',
-                description: 'Operation success rate'
+                label: 'Revenue Today',
+                value: `$${this.formatCurrency(stats.revenueToday)}`,
+                target: `$${this.formatCurrency(stats.revenueThisWeek / 7)}`, // Daily average
+                percentage: stats.revenueThisWeek > 0 ? (stats.revenueToday / (stats.revenueThisWeek / 7) * 100) : 0
             },
             {
-                title: 'Error Rate',
-                value: '0.2%',
-                status: 'good',
-                description: 'System error rate'
+                label: 'User Engagement',
+                value: `${((stats.activeUsers / Math.max(stats.totalUsers, 1)) * 100).toFixed(1)}%`,
+                target: '80%',
+                percentage: (stats.activeUsers / Math.max(stats.totalUsers, 1)) * 100
             }
         ];
 
-        const statusColors = {
-            excellent: 'green',
-            good: 'blue',
-            warning: 'yellow',
-            poor: 'red'
+        return metrics.map(metric => {
+            const isGood = metric.percentage >= 80;
+            const barColor = isGood ? 'bg-green-500' : metric.percentage >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+            
+            return `
+                <div class="p-4 bg-gray-50 rounded-lg">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium text-gray-700">${metric.label}</span>
+                        <span class="text-sm font-semibold">${metric.value}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                        <div class="${barColor} h-2 rounded-full transition-all duration-300" style="width: ${Math.min(metric.percentage, 100)}%"></div>
+                    </div>
+                    <div class="text-xs text-gray-500">Target: ${metric.target}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    createOperationsTableRows(operations, totalOperations) {
+        if (!operations || operations.length === 0) {
+            return '<tr><td colspan="5" class="text-center py-4 text-gray-500">No operation data available</td></tr>';
+        }
+
+        return operations.map(op => {
+            const share = totalOperations > 0 ? (op.count / totalOperations * 100) : 0;
+            const avgRevenue = op.count > 0 ? (op.revenue || 0) / op.count : 0;
+            
+            return `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+                            <span class="text-sm font-medium text-gray-900">${this.formatOperationName(op.operation)}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatNumber(op.count)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${this.formatCurrency(op.revenue || 0)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${avgRevenue.toFixed(3)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: ${share}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-900">${share.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async postRender() {
+        window.analyticsComponent = this;
+        
+        // Initialize charts with real data
+        if (window.chartComponent && this.analyticsData) {
+            this.initializeCharts();
+        }
+    }
+
+    initializeCharts() {
+        this.renderUsageTrendsChart();
+        this.renderOperationsDistributionChart();
+        this.renderRevenueChart();
+        this.renderUserActivityChart();
+    }
+
+    renderUsageTrendsChart() {
+        const stats = this.analyticsData.stats;
+        
+        if (this.currentView === 'operations') {
+            // Show operations trend (simplified - you can enhance with historical data)
+            const data = {
+                labels: ['Today', 'This Week', 'Total'],
+                datasets: [{
+                    label: 'Operations',
+                    data: [stats.operationsToday, stats.operationsThisWeek, stats.totalOperations],
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            };
+            
+            if (window.chartComponent) {
+                window.chartComponent.updateLineChart(
+                    document.getElementById('usage-trends-chart'), 
+                    data, 
+                    { height: 250, showPoints: true }
+                );
+            }
+        } else if (this.currentView === 'revenue') {
+            // Show revenue trend
+            const data = {
+                labels: ['Today', 'This Week', 'Total'],
+                datasets: [{
+                    label: 'Revenue ($)',
+                    data: [stats.revenueToday, stats.revenueThisWeek, stats.totalRevenue],
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderColor: 'rgb(16, 185, 129)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            };
+            
+            if (window.chartComponent) {
+                window.chartComponent.updateLineChart(
+                    document.getElementById('usage-trends-chart'), 
+                    data, 
+                    { height: 250, showPoints: true }
+                );
+            }
+        }
+    }
+
+    renderOperationsDistributionChart() {
+        const operations = this.analyticsData.stats.topOperations || [];
+        
+        if (operations.length === 0) {
+            document.getElementById('operations-distribution-chart').innerHTML = 
+                '<div class="flex items-center justify-center h-64 text-gray-500">No operation data available</div>';
+            return;
+        }
+
+        const data = {
+            labels: operations.map(op => this.formatOperationName(op.operation)),
+            datasets: [{
+                data: operations.map(op => op.count),
+                backgroundColor: [
+                    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16'
+                ].slice(0, operations.length),
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
         };
 
-        return metrics.map(metric => `
-            <div class="text-center">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-${statusColors[metric.status]}-100 mb-3">
-                    <span class="text-2xl font-bold text-${statusColors[metric.status]}-600">${metric.value}</span>
-                </div>
-                <h4 class="text-lg font-medium text-gray-900">${metric.title}</h4>
-                <p class="text-sm text-gray-600">${metric.description}</p>
-            </div>
-        `).join('');
+        if (window.chartComponent) {
+            window.chartComponent.updateDoughnutChart(
+                document.getElementById('operations-distribution-chart'),
+                data,
+                { height: 250, cutout: '50%' }
+            );
+        }
+    }
+
+    renderRevenueChart() {
+        const stats = this.analyticsData.stats;
+        
+        const data = {
+            labels: ['Today', 'This Week', 'Total'],
+            datasets: [{
+                label: 'Revenue',
+                data: [stats.revenueToday, stats.revenueThisWeek, stats.totalRevenue],
+                backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                borderColor: 'rgb(16, 185, 129)',
+                borderWidth: 1
+            }]
+        };
+
+        if (window.chartComponent) {
+            window.chartComponent.updateBarChart(
+                document.getElementById('revenue-chart'),
+                data,
+                { height: 250 }
+            );
+        }
+    }
+
+    renderUserActivityChart() {
+        const stats = this.analyticsData.stats;
+        
+        const data = {
+            labels: ['Active Users', 'Inactive Users'],
+            datasets: [{
+                data: [stats.activeUsers, stats.totalUsers - stats.activeUsers],
+                backgroundColor: ['#10B981', '#E5E7EB'],
+                borderWidth: 0
+            }]
+        };
+
+        if (window.chartComponent) {
+            window.chartComponent.updateDoughnutChart(
+                document.getElementById('user-activity-chart'),
+                data,
+                { height: 200, cutout: '60%' }
+            );
+        }
+    }
+
+    switchChartView(view) {
+        this.currentView = view;
+        
+        // Update button states
+        document.querySelectorAll('.chart-view-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-view="${view}"]`).classList.add('active');
+        
+        // Re-render the chart
+        this.renderUsageTrendsChart();
+    }
+
+    async refreshAnalytics() {
+        try {
+            window.showNotification('Refreshing analytics...', 'info', 2000);
+            this.analyticsData = await window.adminAPI.getDashboard();
+            
+            // Re-render the component
+            const content = this.createAnalyticsHTML();
+            document.getElementById('page-content').innerHTML = content;
+            await this.postRender();
+            
+            window.showNotification('Analytics refreshed successfully!', 'success');
+        } catch (error) {
+            window.showNotification('Failed to refresh analytics', 'error');
+        }
+    }
+
+    exportData() {
+        try {
+            const csvData = this.generateCSVData();
+            this.downloadFile(csvData, 'analytics-data.csv', 'text/csv');
+            window.showNotification('Analytics data exported successfully', 'success');
+        } catch (error) {
+            window.showNotification('Failed to export data', 'error');
+        }
+    }
+
+    generateCSVData() {
+        const stats = this.analyticsData.stats;
+        const operations = stats.topOperations || [];
+        
+        const headers = ['Operation', 'Count', 'Revenue', 'Average Revenue'];
+        const rows = operations.map(op => [
+            this.formatOperationName(op.operation),
+            op.count,
+            (op.revenue || 0).toFixed(2),
+            op.count > 0 ? ((op.revenue || 0) / op.count).toFixed(3) : '0.000'
+        ]);
+        
+        return [headers, ...rows].map(row => row.join(',')).join('\n');
+    }
+
+    downloadFile(content, filename, contentType) {
+        const blob = new Blob([content], { type: contentType });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Utility functions
+    formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num.toString();
+    }
+
+    formatCurrency(amount) {
+        return parseFloat(amount || 0).toFixed(2);
+    }
+
+    formatOperationName(operation) {
+        return operation.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
     createErrorHTML() {
@@ -258,236 +554,7 @@ class AnalyticsComponent {
         `;
     }
 
-    async postRender() {
-        // Make component available to onclick handlers
-        window.analyticsComponent = this;
-        
-        // Initialize charts
-        this.initializeCharts();
-        
-        // Setup chart view buttons
-        this.setupChartViewButtons();
-    }
-
-    initializeCharts() {
-        // Usage trends chart
-        this.renderUsageTrendsChart();
-        
-        // Operations distribution chart
-        this.renderOperationsDistributionChart();
-        
-        // Revenue chart
-        this.renderRevenueChart();
-        
-        // User activity chart
-        this.renderUserActivityChart();
-        
-        // Peak hours chart
-        this.renderPeakHoursChart();
-    }
-
-    renderUsageTrendsChart() {
-        const container = document.getElementById('usage-trends-chart');
-        if (!container) return;
-
-        // Generate sample data
-        const data = {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            datasets: [{
-                label: 'Operations',
-                data: [120, 150, 180, 200, 160, 90, 70],
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                borderColor: 'rgb(59, 130, 246)',
-                tension: 0.4
-            }]
-        };
-
-        window.chartComponent.createLineChart('usage-trends-chart', data, {
-            height: 250,
-            showPoints: true
-        });
-    }
-
-    renderOperationsDistributionChart() {
-        const data = {
-            labels: ['Compress', 'Merge', 'Split', 'Protect', 'Convert'],
-            datasets: [{
-                data: [35, 25, 20, 12, 8],
-                backgroundColor: [
-                    '#3B82F6',
-                    '#10B981',
-                    '#F59E0B',
-                    '#EF4444',
-                    '#8B5CF6'
-                ]
-            }]
-        };
-
-        window.chartComponent.createDoughnutChart('operations-distribution-chart', data, {
-            height: 250
-        });
-    }
-
-    renderRevenueChart() {
-        const data = {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-            datasets: [{
-                label: 'Revenue',
-                data: [1200, 1500, 1800, 2200, 1900, 2400],
-                backgroundColor: 'rgba(168, 85, 247, 0.1)',
-                borderColor: 'rgb(168, 85, 247)',
-                tension: 0.4
-            }]
-        };
-
-        window.chartComponent.createLineChart('revenue-chart', data, {
-            height: 250
-        });
-    }
-
-    renderUserActivityChart() {
-        const data = {
-            labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-            datasets: [{
-                label: 'Active Users',
-                data: [450, 520, 480, 590],
-                backgroundColor: '#10B981'
-            }]
-        };
-
-        window.chartComponent.createBarChart('user-activity-chart', data, {
-            height: 250
-        });
-    }
-
-    renderPeakHoursChart() {
-        const data = {
-            labels: ['6AM', '9AM', '12PM', '3PM', '6PM', '9PM'],
-            datasets: [{
-                label: 'Operations',
-                data: [20, 80, 120, 100, 150, 60],
-                backgroundColor: 'rgba(245, 158, 11, 0.8)',
-                borderColor: 'rgb(245, 158, 11)',
-                tension: 0.4
-            }]
-        };
-
-        window.chartComponent.createLineChart('peak-hours-chart', data, {
-            height: 250
-        });
-    }
-
-    setupChartViewButtons() {
-        const buttons = document.querySelectorAll('.chart-view-btn');
-        buttons.forEach(button => {
-            button.addEventListener('click', () => {
-                buttons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-            });
-        });
-
-        // Add CSS for chart view buttons
-        const style = document.createElement('style');
-        style.textContent = `
-            .chart-view-btn {
-                padding: 0.5rem 1rem;
-                border: 1px solid #e5e7eb;
-                background: white;
-                color: #6b7280;
-                font-size: 0.875rem;
-                border-radius: 0.375rem;
-                cursor: pointer;
-                transition: all 0.2s;
-            }
-            .chart-view-btn:first-child {
-                border-top-right-radius: 0;
-                border-bottom-right-radius: 0;
-                border-right: none;
-            }
-            .chart-view-btn:last-child {
-                border-top-left-radius: 0;
-                border-bottom-left-radius: 0;
-            }
-            .chart-view-btn.active {
-                background: #3b82f6;
-                color: white;
-                border-color: #3b82f6;
-            }
-            .chart-view-btn:hover:not(.active) {
-                background: #f3f4f6;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    changeTimeRange(range) {
-        this.currentDateRange = range;
-        // Re-fetch data and update charts
-        this.refreshAnalytics();
-    }
-
-    switchChartView(view) {
-        // Switch between operations and users view in usage trends
-        if (view === 'operations') {
-            this.renderUsageTrendsChart();
-        } else if (view === 'users') {
-            // Render users chart
-            const data = {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                datasets: [{
-                    label: 'Active Users',
-                    data: [80, 95, 110, 125, 100, 60, 45],
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    borderColor: 'rgb(16, 185, 129)',
-                    tension: 0.4
-                }]
-            };
-            window.chartComponent.updateLineChart(
-                document.getElementById('usage-trends-chart'), 
-                data, 
-                { height: 250, showPoints: true }
-            );
-        }
-    }
-
-    async refreshAnalytics() {
-        try {
-            this.analyticsData = await window.adminAPI.getDashboard();
-            this.initializeCharts();
-            window.showNotification('Analytics data refreshed', 'success');
-        } catch (error) {
-            window.showNotification('Failed to refresh analytics', 'error');
-        }
-    }
-
-    refreshMetrics() {
-        this.refreshAnalytics();
-    }
-
-    exportData() {
-        // Export analytics data as CSV
-        const csvData = this.generateCSVData();
-        window.utils.downloadFile(csvData, 'analytics-data.csv', 'text/csv');
-        window.showNotification('Analytics data exported successfully', 'success');
-    }
-
-    generateCSVData() {
-        const headers = ['Date', 'Operations', 'Users', 'Revenue'];
-        const rows = [
-            ['2023-07-01', '120', '80', '240.00'],
-            ['2023-07-02', '150', '95', '300.00'],
-            ['2023-07-03', '180', '110', '360.00'],
-            ['2023-07-04', '200', '125', '400.00'],
-            ['2023-07-05', '160', '100', '320.00'],
-            ['2023-07-06', '90', '60', '180.00'],
-            ['2023-07-07', '70', '45', '140.00']
-        ];
-        
-        return [headers, ...rows].map(row => row.join(',')).join('\n');
-    }
-
     cleanup() {
-        // Cleanup charts
         if (window.chartComponent) {
             window.chartComponent.destroyAll();
         }

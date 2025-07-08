@@ -1,19 +1,59 @@
-// Create this file: api/templates/assets/js/components/branding.js
-
-// Admin Panel Branding Management Component
+// Enhanced Branding Component with Upload Functionality and Default Logo
 class BrandingComponent {
     constructor() {
         this.branding = null;
         this.unsavedChanges = false;
+        this.uploadedFiles = {}; // Track uploaded files
     }
 
     async render() {
         try {
+            this.ensureBrandingAPI();
             this.branding = await window.adminAPI.getBranding();
             return this.createBrandingHTML();
         } catch (error) {
             console.error('Failed to load branding:', error);
             return this.createErrorHTML();
+        }
+    }
+
+    ensureBrandingAPI() {
+        if (!window.adminAPI) {
+            throw new Error('AdminAPI not available');
+        }
+
+        if (!window.adminAPI.getBranding) {
+            window.adminAPI.getBranding = async function() {
+                return await this.request('/api/admin/branding');
+            };
+
+            window.adminAPI.updateBranding = async function(branding) {
+                return await this.request('/api/admin/branding', {
+                    method: 'PUT',
+                    body: JSON.stringify(branding),
+                });
+            };
+
+            window.adminAPI.resetBranding = async function() {
+                return await this.request('/api/admin/branding/reset', {
+                    method: 'POST',
+                });
+            };
+
+            // Add upload function
+            window.adminAPI.uploadBrandingImage = async function(file, type) {
+                const formData = new FormData();
+                formData.append('image', file);
+                formData.append('type', type); // 'logo', 'favicon', 'icon'
+                
+                return await fetch(`${this.baseURL}/api/admin/branding/upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${this.token}`,
+                    },
+                    body: formData
+                }).then(response => response.json());
+            };
         }
     }
 
@@ -37,11 +77,11 @@ class BrandingComponent {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        App Name *
+                                        App Name
                                     </label>
                                     <input type="text" name="appName" 
                                            value="${this.escapeHtml(this.branding?.appName || '')}" 
-                                           maxlength="100" required
+                                           maxlength="100"
                                            class="form-input w-full" 
                                            placeholder="MegaPDF">
                                     <p class="text-sm text-gray-500 mt-1">
@@ -65,10 +105,10 @@ class BrandingComponent {
                                 
                                 <div class="md:col-span-2">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        App Description *
+                                        App Description
                                     </label>
                                     <textarea name="appDescription" rows="3" 
-                                              maxlength="500" required
+                                              maxlength="500"
                                               class="form-input w-full" 
                                               placeholder="Professional PDF tools and document processing platform">${this.escapeHtml(this.branding?.appDescription || '')}</textarea>
                                     <p class="text-sm text-gray-500 mt-1">
@@ -78,61 +118,139 @@ class BrandingComponent {
                             </div>
                         </div>
 
-                        <!-- Logos & Icons -->
+                        <!-- Enhanced Logos & Icons Section -->
                         <div class="bg-white rounded-lg shadow p-6">
                             <h3 class="text-lg font-medium text-gray-900 mb-6">Logos & Icons</h3>
                             
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Main Logo Section -->
+                            <div class="mb-8">
+                                <h4 class="text-md font-medium text-gray-800 mb-4">Main Logo</h4>
+                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <!-- Logo Preview -->
+                                    <div class="lg:col-span-1">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+                                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
+                                            <img id="logo-preview" 
+                                                 src="${this.getLogoPreviewUrl()}" 
+                                                 alt="Logo Preview" 
+                                                 class="mx-auto max-h-24 max-w-full object-contain"
+                                                 onerror="this.src='${this.getDefaultLogoUrl()}'; this.onerror=null;">
+                                            <p class="text-sm text-gray-500 mt-2">Logo Preview</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Logo Upload -->
+                                    <div class="lg:col-span-2">
+                                        <div class="space-y-4">
+                                            <!-- Upload Option -->
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                    Upload Logo
+                                                </label>
+                                                <div class="flex items-center space-x-4">
+                                                    <label class="relative cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                                        <i class="fas fa-upload mr-2"></i>
+                                                        Choose File
+                                                        <input type="file" 
+                                                               id="logo-upload" 
+                                                               accept="image/*" 
+                                                               class="hidden"
+                                                               onchange="window.brandingComponent.handleLogoUpload(event)">
+                                                    </label>
+                                                    <span id="logo-filename" class="text-sm text-gray-500">No file chosen</span>
+                                                </div>
+                                                <p class="text-sm text-gray-500 mt-1">
+                                                    Recommended: PNG or SVG, max 2MB, 400x200px or similar ratio
+                                                </p>
+                                            </div>
+                                            
+                                            <!-- Hidden URL field (populated by upload) -->
+                                            <input type="hidden" name="logoUrl" id="logo-url-input" value="${this.escapeHtml(this.branding?.logoUrl || '')}">
+                                            
+                                            <!-- Logo Alt Text -->
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                    Logo Alt Text
+                                                </label>
+                                                <input type="text" name="logoAltText" 
+                                                       value="${this.escapeHtml(this.branding?.logoAltText || '')}" 
+                                                       class="form-input w-full" 
+                                                       placeholder="MegaPDF Logo">
+                                                <p class="text-sm text-gray-500 mt-1">
+                                                    Alt text for accessibility (optional)
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Other Icons -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-200">
+                                <!-- Favicon -->
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        Logo URL
+                                        Favicon
                                     </label>
-                                    <input type="url" name="logoUrl" 
-                                           value="${this.escapeHtml(this.branding?.logoUrl || '')}" 
-                                           class="form-input w-full" 
-                                           placeholder="/images/logo.png">
-                                    <p class="text-sm text-gray-500 mt-1">
-                                        URL to your main logo image
-                                    </p>
+                                    <div class="space-y-3">
+                                        <div class="flex items-center space-x-4">
+                                            <label class="relative cursor-pointer bg-gray-600 text-white px-3 py-2 rounded text-sm hover:bg-gray-700 transition-colors">
+                                                <i class="fas fa-upload mr-1"></i>
+                                                Upload
+                                                <input type="file" 
+                                                       id="favicon-upload" 
+                                                       accept="image/*,.ico" 
+                                                       class="hidden"
+                                                       onchange="window.brandingComponent.handleFaviconUpload(event)">
+                                            </label>
+                                            <img id="favicon-preview" 
+                                                 src="${this.branding?.faviconUrl || '/favicon.ico'}" 
+                                                 alt="Favicon" 
+                                                 class="w-6 h-6 object-contain"
+                                                 onerror="this.style.display='none'">
+                                        </div>
+                                        <input type="url" name="faviconUrl" 
+                                               id="favicon-url-input"
+                                               value="${this.escapeHtml(this.branding?.faviconUrl || '')}" 
+                                               class="form-input w-full" 
+                                               placeholder="/favicon.ico">
+                                        <p class="text-sm text-gray-500">
+                                            16x16 or 32x32 px ICO/PNG file
+                                        </p>
+                                    </div>
                                 </div>
                                 
+                                <!-- App Icon -->
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        Logo Alt Text
+                                        App Icon (PWA)
                                     </label>
-                                    <input type="text" name="logoAltText" 
-                                           value="${this.escapeHtml(this.branding?.logoAltText || '')}" 
-                                           class="form-input w-full" 
-                                           placeholder="MegaPDF Logo">
-                                    <p class="text-sm text-gray-500 mt-1">
-                                        Alt text for accessibility (required if logo URL is provided)
-                                    </p>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        Favicon URL
-                                    </label>
-                                    <input type="url" name="faviconUrl" 
-                                           value="${this.escapeHtml(this.branding?.faviconUrl || '')}" 
-                                           class="form-input w-full" 
-                                           placeholder="/favicon.ico">
-                                    <p class="text-sm text-gray-500 mt-1">
-                                        URL to your favicon
-                                    </p>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        App Icon URL
-                                    </label>
-                                    <input type="url" name="iconUrl" 
-                                           value="${this.escapeHtml(this.branding?.iconUrl || '')}" 
-                                           class="form-input w-full" 
-                                           placeholder="/images/icon.png">
-                                    <p class="text-sm text-gray-500 mt-1">
-                                        URL to your app icon (for mobile/PWA)
-                                    </p>
+                                    <div class="space-y-3">
+                                        <div class="flex items-center space-x-4">
+                                            <label class="relative cursor-pointer bg-gray-600 text-white px-3 py-2 rounded text-sm hover:bg-gray-700 transition-colors">
+                                                <i class="fas fa-upload mr-1"></i>
+                                                Upload
+                                                <input type="file" 
+                                                       id="icon-upload" 
+                                                       accept="image/*" 
+                                                       class="hidden"
+                                                       onchange="window.brandingComponent.handleIconUpload(event)">
+                                            </label>
+                                            <img id="icon-preview" 
+                                                 src="${this.branding?.iconUrl || ''}" 
+                                                 alt="App Icon" 
+                                                 class="w-8 h-8 object-contain rounded"
+                                                 onerror="this.style.display='none'">
+                                        </div>
+                                        <input type="url" name="iconUrl" 
+                                               id="icon-url-input"
+                                               value="${this.escapeHtml(this.branding?.iconUrl || '')}" 
+                                               class="form-input w-full" 
+                                               placeholder="/images/icon.png">
+                                        <p class="text-sm text-gray-500">
+                                            512x512 px PNG file for mobile/PWA
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -320,11 +438,10 @@ class BrandingComponent {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            Company Name *
+                                            Company Name
                                         </label>
                                         <input type="text" name="footerCompanyName" 
                                                value="${this.escapeHtml(this.branding?.footer?.companyName || '')}" 
-                                               required
                                                class="form-input w-full" 
                                                placeholder="MegaPDF">
                                     </div>
@@ -382,27 +499,105 @@ class BrandingComponent {
         `;
     }
 
-    createErrorHTML() {
-        return `
-            <div class="page-transition">
-                <div class="text-center py-12">
-                    <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
-                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Failed to Load Branding</h2>
-                    <p class="text-gray-600 mb-4">There was an error loading the branding data.</p>
-                    <button onclick="window.adminApp.loadPage('branding')" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                        <i class="fas fa-redo mr-2"></i>
-                        Try Again
-                    </button>
-                </div>
-            </div>
-        `;
+    getDefaultLogoUrl() {
+        // You can replace this with your actual default logo URL
+        return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzM5OGVmNCIvPgogIDx0ZXh0IHg9IjEwMCIgeT0iNTUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1lZ2FQREY8L3RleHQ+Cjwvc3ZnPg==';
+    }
+
+    getLogoPreviewUrl() {
+        return this.branding?.logoUrl || this.getDefaultLogoUrl();
+    }
+
+    // Upload Handlers
+    async handleLogoUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            document.getElementById('logo-filename').textContent = file.name;
+            
+            // Show immediate preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('logo-preview').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+
+            // Upload to server
+            window.showNotification('Uploading logo...', 'info', 2000);
+            const result = await window.adminAPI.uploadBrandingImage(file, 'logo');
+            
+            if (result.success) {
+                document.getElementById('logo-url-input').value = result.url;
+                this.uploadedFiles.logo = result.url;
+                window.showNotification('Logo uploaded successfully!', 'success');
+            } else {
+                throw new Error(result.error || 'Upload failed');
+            }
+        } catch (error) {
+            window.showNotification('Failed to upload logo: ' + error.message, 'error');
+            // Reset file input
+            event.target.value = '';
+            document.getElementById('logo-filename').textContent = 'No file chosen';
+        }
+    }
+
+    async handleFaviconUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            window.showNotification('Uploading favicon...', 'info', 2000);
+            const result = await window.adminAPI.uploadBrandingImage(file, 'favicon');
+            
+            if (result.success) {
+                document.getElementById('favicon-url-input').value = result.url;
+                document.getElementById('favicon-preview').src = result.url;
+                document.getElementById('favicon-preview').style.display = 'block';
+                this.uploadedFiles.favicon = result.url;
+                window.showNotification('Favicon uploaded successfully!', 'success');
+            } else {
+                throw new Error(result.error || 'Upload failed');
+            }
+        } catch (error) {
+            window.showNotification('Failed to upload favicon: ' + error.message, 'error');
+        }
+    }
+
+    async handleIconUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            window.showNotification('Uploading app icon...', 'info', 2000);
+            const result = await window.adminAPI.uploadBrandingImage(file, 'icon');
+            
+            if (result.success) {
+                document.getElementById('icon-url-input').value = result.url;
+                document.getElementById('icon-preview').src = result.url;
+                document.getElementById('icon-preview').style.display = 'block';
+                this.uploadedFiles.icon = result.url;
+                window.showNotification('App icon uploaded successfully!', 'success');
+            } else {
+                throw new Error(result.error || 'Upload failed');
+            }
+        } catch (error) {
+            window.showNotification('Failed to upload app icon: ' + error.message, 'error');
+        }
+    }
+
+    updateLogoPreview() {
+        const url = document.getElementById('logo-url-input').value;
+        const preview = document.getElementById('logo-preview');
+        if (url) {
+            preview.src = url;
+        } else {
+            preview.src = this.getDefaultLogoUrl();
+        }
     }
 
     async postRender() {
-        // Make component available to onclick handlers
         window.brandingComponent = this;
-        
-        // Setup form change detection
         this.setupChangeDetection();
     }
 
@@ -410,12 +605,10 @@ class BrandingComponent {
         const form = document.getElementById('branding-form');
         if (!form) return;
 
-        // Track changes to warn user before leaving
         form.addEventListener('input', () => {
             this.unsavedChanges = true;
         });
 
-        // Warn before leaving page with unsaved changes
         window.addEventListener('beforeunload', (e) => {
             if (this.unsavedChanges) {
                 e.preventDefault();
@@ -427,41 +620,42 @@ class BrandingComponent {
     async saveBranding(event) {
         event.preventDefault();
         
+        this.ensureBrandingAPI();
+        
         const formData = new FormData(event.target);
         
-        // Build branding object
         const branding = {
-            appName: formData.get('appName'),
-            appDescription: formData.get('appDescription'),
-            appTagline: formData.get('appTagline'),
-            logoUrl: formData.get('logoUrl'),
-            logoAltText: formData.get('logoAltText'),
-            faviconUrl: formData.get('faviconUrl'),
-            iconUrl: formData.get('iconUrl'),
+            appName: formData.get('appName') || '',
+            appDescription: formData.get('appDescription') || '',
+            appTagline: formData.get('appTagline') || '',
+            logoUrl: formData.get('logoUrl') || '',
+            logoAltText: formData.get('logoAltText') || '',
+            faviconUrl: formData.get('faviconUrl') || '',
+            iconUrl: formData.get('iconUrl') || '',
             seo: {
-                metaTitle: formData.get('seoMetaTitle'),
-                metaDescription: formData.get('seoMetaDescription'),
+                metaTitle: formData.get('seoMetaTitle') || '',
+                metaDescription: formData.get('seoMetaDescription') || '',
                 metaKeywords: formData.get('seoMetaKeywords') ? 
                     formData.get('seoMetaKeywords').split(',').map(k => k.trim()).filter(k => k) : [],
-                ogImage: formData.get('seoOgImage'),
-                twitterSite: formData.get('seoTwitterSite'),
+                ogImage: formData.get('seoOgImage') || '',
+                twitterSite: formData.get('seoTwitterSite') || '',
             },
             socialMedia: {
-                twitter: formData.get('socialTwitter'),
-                facebook: formData.get('socialFacebook'),
-                github: formData.get('socialGithub'),
-                linkedin: formData.get('socialLinkedin'),
+                twitter: formData.get('socialTwitter') || '',
+                facebook: formData.get('socialFacebook') || '',
+                github: formData.get('socialGithub') || '',
+                linkedin: formData.get('socialLinkedin') || '',
             },
             contact: {
-                email: formData.get('contactEmail'),
-                phone: formData.get('contactPhone'),
-                supportUrl: formData.get('contactSupportUrl'),
-                documentationUrl: formData.get('contactDocumentationUrl'),
+                email: formData.get('contactEmail') || '',
+                phone: formData.get('contactPhone') || '',
+                supportUrl: formData.get('contactSupportUrl') || '',
+                documentationUrl: formData.get('contactDocumentationUrl') || '',
             },
             footer: {
-                companyName: formData.get('footerCompanyName'),
-                copyright: formData.get('footerCopyright'),
-                customText: formData.get('footerCustomText'),
+                companyName: formData.get('footerCompanyName') || '',
+                copyright: formData.get('footerCopyright') || '',
+                customText: formData.get('footerCustomText') || '',
                 showBranding: formData.get('footerShowBranding') === 'on',
                 links: this.branding?.footer?.links || [],
                 legalLinks: this.branding?.footer?.legalLinks || [],
@@ -498,6 +692,22 @@ class BrandingComponent {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    createErrorHTML() {
+        return `
+            <div class="page-transition">
+                <div class="text-center py-12">
+                    <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Failed to Load Branding</h2>
+                    <p class="text-gray-600 mb-4">There was an error loading the branding data.</p>
+                    <button onclick="window.adminApp.loadPage('branding')" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-redo mr-2"></i>
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        `;
     }
 
     cleanup() {

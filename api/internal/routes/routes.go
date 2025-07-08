@@ -301,6 +301,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			admin.GET("/branding", adminHandler.GetBranding)
 			admin.PUT("/branding", adminHandler.UpdateBranding)
 			admin.POST("/branding/reset", adminHandler.ResetBranding)
+			admin.POST("/branding/upload", adminHandler.UploadBrandingImage)
 		}
 
 	}

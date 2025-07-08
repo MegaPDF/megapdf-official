@@ -147,6 +147,34 @@
             border-radius: inherit;
             transition: width 0.3s ease;
         }
+        .form-input {
+            appearance: none;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            color: #111827;
+            background-color: #ffffff;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .form-checkbox {
+            appearance: none;
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            background-color: #ffffff;
+            cursor: pointer;
+        }
+        .form-checkbox:checked {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+            background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='m13.854 3.646-7.5 7.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6 10.293l7.146-7.147a.5.5 0 0 1 .708.708z'/%3e%3c/svg%3e");
+        }
     </style>
 </head>
 <body class="h-full bg-gray-50">
@@ -240,7 +268,7 @@
             </div>
             
             <!-- Navigation -->
-            <nav class="mt-8 px-4">
+            <nav class="mt-8 px-4 custom-scrollbar overflow-y-auto" style="height: calc(100vh - 200px);">
                 <div class="space-y-2">
                     <a href="#" class="nav-item group flex items-center px-4 py-3 text-sm font-medium rounded-xl text-gray-300 hover:text-white hover:bg-gray-700/50 transition-all duration-200 active" data-page="dashboard">
                         <i class="fas fa-chart-line mr-3 text-blue-400 group-hover:text-blue-300"></i>
@@ -275,6 +303,14 @@
                     <a href="#" class="nav-item group flex items-center px-4 py-3 text-sm font-medium rounded-xl text-gray-300 hover:text-white hover:bg-gray-700/50 transition-all duration-200" data-page="pricing">
                         <i class="fas fa-dollar-sign mr-3 text-emerald-400 group-hover:text-emerald-300"></i>
                         Pricing
+                        <span class="ml-auto">
+                            <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                        </span>
+                    </a>
+                    
+                    <a href="#" class="nav-item group flex items-center px-4 py-3 text-sm font-medium rounded-xl text-gray-300 hover:text-white hover:bg-gray-700/50 transition-all duration-200" data-page="branding">
+                        <i class="fas fa-palette mr-3 text-pink-400 group-hover:text-pink-300"></i>
+                        Branding
                         <span class="ml-auto">
                             <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
                         </span>
@@ -342,7 +378,7 @@
                         </button>
                         <div class="hidden md:flex items-center space-x-2">
                             <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-chart-line text-white text-sm"></i>
+                                <i class="fas fa-chart-line text-white text-sm" id="page-icon"></i>
                             </div>
                             <h1 id="page-title" class="text-xl font-semibold text-gray-800">Dashboard</h1>
                         </div>
@@ -401,6 +437,45 @@
     <!-- Toast Notifications -->
     <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
 
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fas fa-exclamation-triangle text-red-600"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                                Confirm Action
+                            </h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-gray-500" id="modal-message">
+                                    Are you sure you want to perform this action?
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" id="modal-confirm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        Confirm
+                    </button>
+                    <button type="button" id="modal-cancel" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts - Load in order of dependency -->
     <script src="/admin-assets/js/utils/helpers.js"></script>
     <script src="/admin-assets/js/utils/notifications.js"></script>
@@ -414,7 +489,176 @@
     <script src="/admin-assets/js/components/settings.js"></script>
     <script src="/admin-assets/js/components/pricing.js"></script>
     <script src="/admin-assets/js/components/tools.js"></script>
+    <script src="/admin-assets/js/components/branding.js"></script>
     <script src="/admin-assets/js/admin.js"></script>
+
+    <!-- Global Utility Functions -->
+    <script>
+        // Global notification functions
+        window.showNotification = function(message, type = 'info', duration = 5000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+            
+            const icons = {
+                success: 'fas fa-check-circle',
+                error: 'fas fa-exclamation-circle',
+                warning: 'fas fa-exclamation-triangle',
+                info: 'fas fa-info-circle'
+            };
+            
+            toast.className = `${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full opacity-0 flex items-center space-x-3 min-w-80`;
+            toast.innerHTML = `
+                <i class="${icons[type]}"></i>
+                <span class="flex-1">${message}</span>
+                <button onclick="this.parentElement.remove()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full', 'opacity-0');
+            }, 100);
+            
+            // Auto remove
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        };
+
+        // Global confirmation function
+        window.showConfirmation = function(message, onConfirm, onCancel = null) {
+            const modal = document.getElementById('confirmation-modal');
+            const messageEl = document.getElementById('modal-message');
+            const confirmBtn = document.getElementById('modal-confirm');
+            const cancelBtn = document.getElementById('modal-cancel');
+            
+            messageEl.textContent = message;
+            modal.classList.remove('hidden');
+            
+            // Clean up old event listeners
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            const newCancelBtn = cancelBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+            
+            // Add new event listeners
+            newConfirmBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                if (onConfirm) onConfirm();
+            });
+            
+            newCancelBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                if (onCancel) onCancel();
+            });
+            
+            // Close on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                    if (onCancel) onCancel();
+                }
+            });
+        };
+
+        // Ensure branding API methods exist
+        function ensureBrandingMethods() {
+            if (window.adminAPI && !window.adminAPI.getBranding) {
+                console.log('Adding missing branding methods to AdminAPI...');
+                
+                window.adminAPI.getBranding = async function() {
+                    return await this.request('/api/admin/branding');
+                };
+
+                window.adminAPI.updateBranding = async function(branding) {
+                    return await this.request('/api/admin/branding', {
+                        method: 'PUT',
+                        body: JSON.stringify(branding),
+                    });
+                };
+
+                window.adminAPI.resetBranding = async function() {
+                    return await this.request('/api/admin/branding/reset', {
+                        method: 'POST',
+                    });
+                };
+                
+                console.log('✅ Branding API methods added successfully');
+            }
+        }
+
+        // Initialize everything when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add branding methods if they don't exist
+            const initBrandingAPI = () => {
+                if (window.adminAPI) {
+                    ensureBrandingMethods();
+                } else {
+                    setTimeout(initBrandingAPI, 100);
+                }
+            };
+            initBrandingAPI();
+
+            // Add branding component to AdminApp
+            const addBrandingComponent = () => {
+                if (window.adminApp && window.BrandingComponent) {
+                    window.adminApp.components.branding = window.BrandingComponent;
+                    console.log('✅ Branding component registered successfully');
+                } else {
+                    setTimeout(addBrandingComponent, 100);
+                }
+            };
+            
+            setTimeout(addBrandingComponent, 1000);
+        });
+
+        // Also ensure methods exist when branding component is used
+        window.checkBrandingAPI = function() {
+            ensureBrandingMethods();
+        };
+        document.addEventListener('DOMContentLoaded', () => {
+    if (window.adminAPI && !window.adminAPI.uploadBrandingImage) {
+        window.adminAPI.uploadBrandingImage = async function(file, type) {
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('type', type); // 'logo', 'favicon', 'icon'
+            
+            try {
+                const response = await fetch(`${this.baseURL}/api/admin/branding/upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${this.token}`,
+                    },
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Upload failed');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Upload error:', error);
+                throw error;
+            }
+        };
+        
+        console.log('✅ Upload method added to AdminAPI');
+    }
+});
+    </script>
 
     <!-- Loading bar animation -->
     <script>

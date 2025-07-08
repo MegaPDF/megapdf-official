@@ -1,4 +1,4 @@
-// Admin Dashboard Component
+// Admin Dashboard Component - Using Real Data
 class DashboardComponent {
     constructor() {
         this.dashboardData = null;
@@ -23,8 +23,23 @@ class DashboardComponent {
             <div class="page-transition">
                 <!-- Page Header -->
                 <div class="mb-8">
-                    <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
-                    <p class="text-gray-600">Overview of your MegaPDF system</p>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+                            <p class="text-gray-600">Overview of your MegaPDF system</p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <div class="flex items-center text-sm text-gray-500">
+                                <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                                Live Data
+                            </div>
+                            <button onclick="window.dashboardComponent.refreshDashboard()" 
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-sync mr-2"></i>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Stats Grid -->
@@ -32,28 +47,90 @@ class DashboardComponent {
                     ${this.createStatsCards(stats)}
                 </div>
 
+                <!-- System Health -->
+                <div class="bg-white rounded-lg shadow p-6 mb-8">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">System Health</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                        ${this.createSystemHealthCards(health)}
+                    </div>
+                </div>
+
                 <!-- Charts and Recent Activity -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <!-- Operations Chart -->
                     <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Operations</h3>
-                        <div id="operations-chart" class="chart-container"></div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Top Operations</h3>
+                            <span class="text-sm text-gray-500">${stats.topOperations?.length || 0} operations</span>
+                        </div>
+                        <div id="operations-chart" class="chart-container h-64"></div>
+                        <div class="mt-4">
+                            ${this.createOperationsTable(stats.topOperations)}
+                        </div>
                     </div>
 
                     <!-- Recent Activity -->
                     <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Recent Activity</h3>
+                            <span class="text-sm text-gray-500">${this.dashboardData.recentActivity?.length || 0} activities</span>
+                        </div>
                         <div class="space-y-3 custom-scrollbar max-h-80 overflow-y-auto">
                             ${this.createRecentActivityList()}
                         </div>
                     </div>
                 </div>
 
-                <!-- System Health -->
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">System Health</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        ${this.createHealthMetrics(health)}
+                <!-- Revenue and Performance Metrics -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <!-- Revenue Overview -->
+                    <div class="lg:col-span-2 bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Revenue Overview</h3>
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-green-600">$${this.formatCurrency(stats.totalRevenue)}</div>
+                                <div class="text-sm text-gray-500">Total Revenue</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-blue-600">$${this.formatCurrency(stats.revenueThisWeek)}</div>
+                                <div class="text-sm text-gray-500">This Week</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-purple-600">$${this.formatCurrency(stats.revenueToday)}</div>
+                                <div class="text-sm text-gray-500">Today</div>
+                            </div>
+                        </div>
+                        <div id="revenue-chart" class="chart-container h-48"></div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Stats</h3>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Operations Today</span>
+                                <span class="font-semibold">${this.formatNumber(stats.operationsToday)}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">This Week</span>
+                                <span class="font-semibold">${this.formatNumber(stats.operationsThisWeek)}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Active Users</span>
+                                <span class="font-semibold">${this.formatNumber(stats.activeUsers)}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Total Users</span>
+                                <span class="font-semibold">${this.formatNumber(stats.totalUsers)}</span>
+                            </div>
+                            <hr class="my-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Avg Revenue/Op</span>
+                                <span class="font-semibold text-green-600">
+                                    $${stats.totalOperations > 0 ? (stats.totalRevenue / stats.totalOperations).toFixed(3) : '0.000'}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -64,160 +141,342 @@ class DashboardComponent {
         const cards = [
             {
                 title: 'Total Users',
-                value: window.utils.formatNumber(stats.totalUsers),
+                value: this.formatNumber(stats.totalUsers),
+                change: stats.activeUsers > 0 ? `${((stats.activeUsers / stats.totalUsers) * 100).toFixed(1)}% active` : 'No active users',
                 icon: 'fas fa-users',
                 color: 'blue',
-                change: stats.activeUsers,
-                changeLabel: 'active users'
+                trend: 'up'
             },
             {
                 title: 'Total Operations',
-                value: window.utils.formatNumber(stats.totalOperations),
-                icon: 'fas fa-file-pdf',
+                value: this.formatNumber(stats.totalOperations),
+                change: stats.operationsToday > 0 ? `+${this.formatNumber(stats.operationsToday)} today` : 'No operations today',
+                icon: 'fas fa-chart-line',
                 color: 'green',
-                change: stats.operationsToday,
-                changeLabel: 'today'
+                trend: stats.operationsToday > 0 ? 'up' : 'neutral'
             },
             {
                 title: 'Total Revenue',
-                value: window.utils.formatCurrency(stats.totalRevenue),
+                value: `$${this.formatCurrency(stats.totalRevenue)}`,
+                change: stats.revenueToday > 0 ? `+$${this.formatCurrency(stats.revenueToday)} today` : 'No revenue today',
                 icon: 'fas fa-dollar-sign',
                 color: 'purple',
-                change: window.utils.formatCurrency(stats.revenueToday),
-                changeLabel: 'today'
+                trend: stats.revenueToday > 0 ? 'up' : 'neutral'
             },
             {
-                title: 'Operations This Week',
-                value: window.utils.formatNumber(stats.operationsThisWeek),
-                icon: 'fas fa-chart-line',
-                color: 'indigo',
-                change: window.utils.formatCurrency(stats.revenueThisWeek),
-                changeLabel: 'revenue'
+                title: 'This Week',
+                value: this.formatNumber(stats.operationsThisWeek),
+                change: stats.revenueThisWeek > 0 ? `$${this.formatCurrency(stats.revenueThisWeek)} revenue` : 'No revenue',
+                icon: 'fas fa-calendar-week',
+                color: 'yellow',
+                trend: stats.operationsThisWeek > 0 ? 'up' : 'neutral'
             }
         ];
 
-        return cards.map(card => `
-            <div class="stats-card bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="flex items-center justify-center h-12 w-12 rounded-md bg-${card.color}-500 text-white">
+        return cards.map(card => {
+            const colorClasses = {
+                blue: 'bg-blue-500',
+                green: 'bg-green-500',
+                purple: 'bg-purple-500',
+                yellow: 'bg-yellow-500'
+            };
+
+            const trendIcon = {
+                up: 'fas fa-arrow-up text-green-500',
+                down: 'fas fa-arrow-down text-red-500',
+                neutral: 'fas fa-minus text-gray-500'
+            };
+
+            return `
+                <div class="stats-card bg-white rounded-lg shadow p-6 border-l-4 border-${card.color}-500">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-600">${card.title}</p>
+                            <p class="text-2xl font-bold text-gray-900">${card.value}</p>
+                            <p class="flex items-center text-sm text-gray-500 mt-1">
+                                <i class="${trendIcon[card.trend]} mr-1"></i>
+                                ${card.change}
+                            </p>
+                        </div>
+                        <div class="w-12 h-12 ${colorClasses[card.color]} rounded-lg flex items-center justify-center text-white">
                             <i class="${card.icon}"></i>
                         </div>
                     </div>
-                    <div class="ml-4 flex-1">
-                        <div class="text-sm font-medium text-gray-500">${card.title}</div>
-                        <div class="text-2xl font-bold text-gray-900">${card.value}</div>
-                        <div class="text-sm text-gray-600">
-                            <span class="font-medium">${card.change}</span>
-                            <span class="text-gray-500">${card.changeLabel}</span>
-                        </div>
-                    </div>
                 </div>
+            `;
+        }).join('');
+    }
+
+    createSystemHealthCards(health) {
+        if (!health) {
+            return '<div class="text-gray-500 text-center col-span-5">System health data unavailable</div>';
+        }
+
+        const healthMetrics = [
+            {
+                label: 'Database',
+                value: health.databaseStatus || 'Unknown',
+                status: health.databaseStatus === 'connected' ? 'good' : 'warning'
+            },
+            {
+                label: 'API Response',
+                value: `${(health.apiResponseTime || 0).toFixed(0)}ms`,
+                status: (health.apiResponseTime || 0) < 200 ? 'good' : (health.apiResponseTime || 0) < 500 ? 'warning' : 'error'
+            },
+            {
+                label: 'Disk Usage',
+                value: `${(health.diskUsage || 0).toFixed(1)}%`,
+                status: (health.diskUsage || 0) < 80 ? 'good' : (health.diskUsage || 0) < 90 ? 'warning' : 'error'
+            },
+            {
+                label: 'Memory Usage',
+                value: `${(health.memoryUsage || 0).toFixed(1)}%`,
+                status: (health.memoryUsage || 0) < 80 ? 'good' : (health.memoryUsage || 0) < 90 ? 'warning' : 'error'
+            },
+            {
+                label: 'Error Rate',
+                value: `${(health.errorRate || 0).toFixed(2)}%`,
+                status: (health.errorRate || 0) < 1 ? 'good' : (health.errorRate || 0) < 5 ? 'warning' : 'error'
+            }
+        ];
+
+        return healthMetrics.map(metric => {
+            const statusColors = {
+                good: 'text-green-600 bg-green-100',
+                warning: 'text-yellow-600 bg-yellow-100', 
+                error: 'text-red-600 bg-red-100'
+            };
+
+            return `
+                <div class="text-center p-3 rounded-lg ${statusColors[metric.status]}">
+                    <div class="font-semibold">${metric.value}</div>
+                    <div class="text-xs">${metric.label}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    createOperationsTable(operations) {
+        if (!operations || operations.length === 0) {
+            return '<div class="text-gray-500 text-center py-4">No operation data available</div>';
+        }
+
+        const maxCount = Math.max(...operations.map(op => op.count));
+
+        return `
+            <div class="space-y-2">
+                ${operations.map(op => {
+                    const percentage = maxCount > 0 ? (op.count / maxCount) * 100 : 0;
+                    return `
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between text-sm mb-1">
+                                    <span class="font-medium text-gray-900">${this.formatOperationName(op.operation)}</span>
+                                    <span class="text-gray-500">$${this.formatCurrency(op.revenue || 0)}</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: ${percentage}%"></div>
+                                </div>
+                            </div>
+                            <div class="w-16 text-sm text-gray-900 text-right ml-3">${this.formatNumber(op.count)}</div>
+                        </div>
+                    `;
+                }).join('')}
             </div>
-        `).join('');
+        `;
     }
 
     createRecentActivityList() {
         if (!this.dashboardData.recentActivity || this.dashboardData.recentActivity.length === 0) {
-            return '<p class="text-gray-500 text-center py-4">No recent activity</p>';
+            return '<div class="text-gray-500 text-center py-4">No recent activity</div>';
         }
 
-        return this.dashboardData.recentActivity.map(activity => `
-            <div class="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg">
-                <div class="flex-shrink-0">
-                    <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                        <i class="fas fa-${this.getOperationIcon(activity.operation)} text-sm text-gray-600"></i>
+        return this.dashboardData.recentActivity.slice(0, 10).map(activity => {
+            const timeAgo = this.timeAgo(new Date(activity.createdAt));
+            const statusColor = {
+                completed: 'text-green-600 bg-green-100',
+                pending: 'text-yellow-600 bg-yellow-100',
+                failed: 'text-red-600 bg-red-100'
+            }[activity.status] || 'text-gray-600 bg-gray-100';
+
+            return `
+                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-${this.getOperationIcon(activity.operation)} text-blue-600 text-xs"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate">
+                            ${activity.userName || 'Unknown User'}
+                        </p>
+                        <p class="text-sm text-gray-500">
+                            ${this.formatOperationName(activity.operation)}
+                            ${activity.amount ? `- $${this.formatCurrency(activity.amount)}` : ''}
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusColor}">
+                            ${activity.status}
+                        </span>
+                        <p class="text-xs text-gray-500 mt-1">${timeAgo}</p>
                     </div>
                 </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900">${activity.userName}</p>
-                    <p class="text-sm text-gray-500">${window.utils.capitalize(activity.operation)} operation</p>
-                </div>
-                <div class="flex-shrink-0 text-right">
-                    <p class="text-sm text-gray-500">${window.utils.formatRelativeTime(activity.createdAt)}</p>
-                    ${activity.amount > 0 ? `<p class="text-xs text-green-600">${window.utils.formatCurrency(activity.amount)}</p>` : ''}
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
-    createHealthMetrics(health) {
-        const metrics = [
-            {
-                name: 'Database',
-                value: health.databaseStatus,
-                status: health.databaseStatus === 'healthy' ? 'success' : 'error'
-            },
-            {
-                name: 'API Response',
-                value: `${health.apiResponseTime}ms`,
-                status: health.apiResponseTime < 100 ? 'success' : health.apiResponseTime < 500 ? 'warning' : 'error'
-            },
-            {
-                name: 'Disk Usage',
-                value: `${health.diskUsage}%`,
-                status: health.diskUsage < 80 ? 'success' : health.diskUsage < 90 ? 'warning' : 'error'
-            },
-            {
-                name: 'Error Rate',
-                value: `${health.errorRate}%`,
-                status: health.errorRate < 1 ? 'success' : health.errorRate < 5 ? 'warning' : 'error'
-            }
-        ];
+    async postRender() {
+        window.dashboardComponent = this;
+        
+        // Initialize charts with real data
+        if (window.chartComponent && this.dashboardData) {
+            this.renderOperationsChart();
+            this.renderRevenueChart();
+        }
+        
+        // Start auto-refresh
+        this.startAutoRefresh();
+    }
 
-        return metrics.map(metric => `
-            <div class="text-center">
-                <div class="text-2xl font-bold ${this.getStatusColor(metric.status)}">${metric.value}</div>
-                <div class="text-sm text-gray-500">${metric.name}</div>
-                <div class="mt-1">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${this.getStatusBadgeClass(metric.status)}">
-                        <i class="fas fa-${this.getStatusIcon(metric.status)} mr-1"></i>
-                        ${window.utils.capitalize(metric.status)}
-                    </span>
-                </div>
-            </div>
-        `).join('');
+    renderOperationsChart() {
+        if (!this.dashboardData.stats.topOperations) return;
+
+        const operations = this.dashboardData.stats.topOperations.slice(0, 5);
+        const data = {
+            labels: operations.map(op => this.formatOperationName(op.operation)),
+            datasets: [{
+                data: operations.map(op => op.count),
+                backgroundColor: [
+                    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'
+                ],
+                borderWidth: 0
+            }]
+        };
+
+        if (window.chartComponent) {
+            window.chartComponent.updateDoughnutChart(
+                document.getElementById('operations-chart'),
+                data,
+                { height: 250, cutout: '60%' }
+            );
+        }
+    }
+
+    renderRevenueChart() {
+        // Simple revenue trend chart (you can enhance this with historical data)
+        const data = {
+            labels: ['Today', 'This Week', 'Total'],
+            datasets: [{
+                label: 'Revenue',
+                data: [
+                    this.dashboardData.stats.revenueToday,
+                    this.dashboardData.stats.revenueThisWeek,
+                    this.dashboardData.stats.totalRevenue
+                ],
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderColor: 'rgb(16, 185, 129)',
+                tension: 0.4
+            }]
+        };
+
+        if (window.chartComponent) {
+            window.chartComponent.updateLineChart(
+                document.getElementById('revenue-chart'),
+                data,
+                { height: 200, showPoints: true }
+            );
+        }
+    }
+
+    async refreshDashboard() {
+        try {
+            window.showNotification('Refreshing dashboard...', 'info', 2000);
+            this.dashboardData = await window.adminAPI.getDashboard();
+            
+            // Re-render the component
+            const content = this.createDashboardHTML();
+            document.getElementById('page-content').innerHTML = content;
+            await this.postRender();
+            
+            window.showNotification('Dashboard refreshed successfully!', 'success');
+        } catch (error) {
+            window.showNotification('Failed to refresh dashboard', 'error');
+        }
+    }
+
+    startAutoRefresh() {
+        // Refresh dashboard every 5 minutes
+        this.refreshInterval = setInterval(async () => {
+            try {
+                const newData = await window.adminAPI.getDashboard();
+                this.dashboardData = newData;
+                this.updateStatsInPlace();
+                this.renderOperationsChart();
+                this.renderRevenueChart();
+            } catch (error) {
+                console.error('Auto-refresh failed:', error);
+            }
+        }, 300000); // 5 minutes
+    }
+
+    updateStatsInPlace() {
+        // Update stat values without full page refresh
+        const stats = this.dashboardData.stats;
+        const statsElements = document.querySelectorAll('.stats-card .text-2xl');
+        
+        if (statsElements.length >= 4) {
+            statsElements[0].textContent = this.formatNumber(stats.totalUsers);
+            statsElements[1].textContent = this.formatNumber(stats.totalOperations);
+            statsElements[2].textContent = `$${this.formatCurrency(stats.totalRevenue)}`;
+            statsElements[3].textContent = this.formatNumber(stats.operationsThisWeek);
+        }
+    }
+
+    // Utility functions
+    formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num.toString();
+    }
+
+    formatCurrency(amount) {
+        return parseFloat(amount || 0).toFixed(2);
+    }
+
+    formatOperationName(operation) {
+        return operation.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
     getOperationIcon(operation) {
         const icons = {
-            'convert': 'exchange-alt',
-            'compress': 'compress-arrows-alt',
-            'merge': 'object-group',
-            'split': 'cut',
-            'protect': 'lock',
-            'unlock': 'unlock',
+            'pdf-merge': 'copy',
+            'pdf-split': 'cut',
+            'pdf-compress': 'compress-arrows-alt',
+            'pdf-convert': 'exchange-alt',
             'deposit': 'credit-card',
-            'default': 'file-pdf'
+            'withdrawal': 'money-bill'
         };
-        return icons[operation] || icons.default;
+        return icons[operation] || 'file-pdf';
     }
 
-    getStatusColor(status) {
-        const colors = {
-            'success': 'text-green-600',
-            'warning': 'text-yellow-600',
-            'error': 'text-red-600'
-        };
-        return colors[status] || 'text-gray-600';
-    }
-
-    getStatusBadgeClass(status) {
-        const classes = {
-            'success': 'bg-green-100 text-green-800',
-            'warning': 'bg-yellow-100 text-yellow-800',
-            'error': 'bg-red-100 text-red-800'
-        };
-        return classes[status] || 'bg-gray-100 text-gray-800';
-    }
-
-    getStatusIcon(status) {
-        const icons = {
-            'success': 'check-circle',
-            'warning': 'exclamation-triangle',
-            'error': 'times-circle'
-        };
-        return icons[status] || 'question-circle';
+    timeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        
+        let interval = Math.floor(seconds / 31536000);
+        if (interval > 1) return interval + ' years ago';
+        
+        interval = Math.floor(seconds / 2592000);
+        if (interval > 1) return interval + ' months ago';
+        
+        interval = Math.floor(seconds / 86400);
+        if (interval > 1) return interval + ' days ago';
+        
+        interval = Math.floor(seconds / 3600);
+        if (interval > 1) return interval + ' hours ago';
+        
+        interval = Math.floor(seconds / 60);
+        if (interval > 1) return interval + ' minutes ago';
+        
+        return 'just now';
     }
 
     createErrorHTML() {
@@ -227,7 +486,7 @@ class DashboardComponent {
                     <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
                     <h2 class="text-2xl font-bold text-gray-900 mb-2">Failed to Load Dashboard</h2>
                     <p class="text-gray-600 mb-4">There was an error loading the dashboard data.</p>
-                    <button onclick="window.adminApp.loadPage('dashboard')" class="btn-primary">
+                    <button onclick="window.adminApp.loadPage('dashboard')" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                         <i class="fas fa-redo mr-2"></i>
                         Try Again
                     </button>
@@ -236,79 +495,12 @@ class DashboardComponent {
         `;
     }
 
-    async postRender() {
-        // Render charts after DOM is updated
-        if (this.dashboardData && this.dashboardData.stats.topOperations) {
-            this.renderOperationsChart();
-        }
-
-        // Start auto-refresh
-        this.startAutoRefresh();
-    }
-
-    renderOperationsChart() {
-        const chartElement = document.getElementById('operations-chart');
-        if (!chartElement) return;
-
-        // Simple chart implementation (you can replace with Chart.js or similar)
-        const operations = this.dashboardData.stats.topOperations;
-        const maxCount = Math.max(...operations.map(op => op.count));
-
-        chartElement.innerHTML = operations.map(op => {
-            const percentage = (op.count / maxCount) * 100;
-            return `
-                <div class="flex items-center mb-3">
-                    <div class="w-20 text-sm text-gray-600">${window.utils.capitalize(op.operation)}</div>
-                    <div class="flex-1 mx-3">
-                        <div class="bg-gray-200 rounded-full h-3">
-                            <div class="bg-blue-500 h-3 rounded-full" style="width: ${percentage}%"></div>
-                        </div>
-                    </div>
-                    <div class="w-16 text-sm text-gray-900 text-right">${window.utils.formatNumber(op.count)}</div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    startAutoRefresh() {
-        // Refresh dashboard every 30 seconds
-        this.refreshInterval = setInterval(async () => {
-            try {
-                const newData = await window.adminAPI.getDashboard();
-                this.dashboardData = newData;
-                this.renderOperationsChart();
-                // Update stats without full re-render
-                this.updateStatsInPlace();
-            } catch (error) {
-                console.error('Auto-refresh failed:', error);
-            }
-        }, 30000);
-    }
-
-    updateStatsInPlace() {
-        // Update stat values without full page refresh
-        const statsCards = document.querySelectorAll('.stats-card');
-        const stats = this.dashboardData.stats;
-        const values = [
-            window.utils.formatNumber(stats.totalUsers),
-            window.utils.formatNumber(stats.totalOperations),
-            window.utils.formatCurrency(stats.totalRevenue),
-            window.utils.formatNumber(stats.operationsThisWeek)
-        ];
-
-        statsCards.forEach((card, index) => {
-            const valueElement = card.querySelector('.text-2xl');
-            if (valueElement && values[index]) {
-                valueElement.textContent = values[index];
-            }
-        });
-    }
-
     cleanup() {
         if (this.refreshInterval) {
             clearInterval(this.refreshInterval);
             this.refreshInterval = null;
         }
+        window.dashboardComponent = null;
     }
 }
 

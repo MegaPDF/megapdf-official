@@ -50,7 +50,7 @@ func ApiKeyMiddleware(keyService *services.KeyValidationService) gin.HandlerFunc
 		allowedDomains := []string{
 			"mega-pdf.com",
 			"www.mega-pdf.com",
-			"localhost",
+			"localhost:3000",
 			"127.0.0.1",
 		}
 

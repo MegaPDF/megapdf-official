@@ -1617,7 +1617,6 @@ func (h *PDFHandler) GetSplitStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, status)
 }
 
-// Fixed watermark functions - replace in api/internal/handlers/pdf_handlers.go
 
 // buildWatermarkDescription builds the description string for pdfcpu stamp command
 func buildWatermarkDescription(watermarkType, position string, rotation, opacity, scale int, textColor string) string {

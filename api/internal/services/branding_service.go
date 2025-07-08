@@ -1,4 +1,4 @@
-// internal/services/branding_service.go
+// internal/services/branding_service.go - Updated with optional validation
 package services
 
 import (
@@ -31,7 +31,7 @@ func (s *BrandingService) UpdateBrandingSettings(branding *models.BrandingConfig
 	fmt.Printf("BRANDING SERVICE: Updating branding settings - app: %s, description: %s\n",
 		branding.AppName, branding.AppDescription)
 
-	// Validate branding settings
+	// Validate branding settings (now with optional validation)
 	if err := s.ValidateBranding(branding); err != nil {
 		return err
 	}
@@ -114,43 +114,34 @@ func (s *BrandingService) GetAppInfo() map[string]string {
 	}
 }
 
-// ValidateBranding performs validation on branding settings
+// ValidateBranding performs validation on branding settings - NOW ALL OPTIONAL
 func (s *BrandingService) ValidateBranding(branding *models.BrandingConfig) error {
-	// Validate app name
-	if branding.AppName == "" {
-		return fmt.Errorf("app name is required")
-	}
-	if len(branding.AppName) > 100 {
+	// Only validate length limits, not required fields
+
+	// Validate app name length (if provided)
+	if branding.AppName != "" && len(branding.AppName) > 100 {
 		return fmt.Errorf("app name must be 100 characters or less")
 	}
 
-	// Validate app description
-	if branding.AppDescription == "" {
-		return fmt.Errorf("app description is required")
-	}
-	if len(branding.AppDescription) > 500 {
+	// Validate app description length (if provided)
+	if branding.AppDescription != "" && len(branding.AppDescription) > 500 {
 		return fmt.Errorf("app description must be 500 characters or less")
 	}
 
-	// Validate SEO meta title
+	// Validate SEO meta title length (if provided)
 	if branding.SEO.MetaTitle != "" && len(branding.SEO.MetaTitle) > 60 {
 		return fmt.Errorf("SEO meta title should be 60 characters or less for optimal display")
 	}
 
-	// Validate SEO meta description
+	// Validate SEO meta description length (if provided)
 	if branding.SEO.MetaDescription != "" && len(branding.SEO.MetaDescription) > 160 {
 		return fmt.Errorf("SEO meta description should be 160 characters or less for optimal display")
 	}
 
-	// Validate logo alt text
-	if branding.LogoAltText == "" && branding.LogoURL != "" {
-		return fmt.Errorf("logo alt text is required when logo URL is provided")
-	}
-
-	// Validate footer company name
-	if branding.Footer.CompanyName == "" {
-		return fmt.Errorf("footer company name is required")
-	}
+	// No logo alt text requirement - completely optional now
+	// No footer company name requirement - completely optional now
+	// No app name requirement - completely optional now
+	// No app description requirement - completely optional now
 
 	return nil
 }

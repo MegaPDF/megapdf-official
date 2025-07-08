@@ -186,6 +186,24 @@ class AdminAPI {
             body: JSON.stringify(pricing),
         });
     }
+
+    // Branding management methods
+    async getBranding() {
+        return await this.request('/api/admin/branding');
+    }
+
+    async updateBranding(branding) {
+        return await this.request('/api/admin/branding', {
+            method: 'PUT',
+            body: JSON.stringify(branding),
+        });
+    }
+
+    async resetBranding() {
+        return await this.request('/api/admin/branding/reset', {
+            method: 'POST',
+        });
+    }
 }
 
 // Create global API instance

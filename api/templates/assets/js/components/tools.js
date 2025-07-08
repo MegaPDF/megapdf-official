@@ -1,227 +1,548 @@
-// PDF Tools Management Component
+// PDF Tools Management Component - Using Real Data
 class ToolsComponent {
     constructor() {
-        this.tools = [];
+        this.toolsData = null;
+        this.dashboardData = null;
+        this.loading = false;
     }
 
     async render() {
         try {
-            const response = await window.adminAPI.getPDFTools();
-            this.tools = response.tools || [];
+            this.loading = true;
+            // Load both tools data and dashboard data for usage statistics
+            const [toolsData, dashboardData] = await Promise.all([
+                window.adminAPI.getPDFTools(),
+                window.adminAPI.getDashboard()
+            ]);
+            
+            this.toolsData = toolsData;
+            this.dashboardData = dashboardData;
+            this.loading = false;
+            
             return this.createToolsHTML();
         } catch (error) {
             console.error('Failed to load tools:', error);
+            this.loading = false;
             return this.createErrorHTML();
         }
     }
 
     createToolsHTML() {
+        const tools = this.toolsData.tools || [];
+        const stats = this.dashboardData.stats;
+        
         return `
             <div class="page-transition">
                 <!-- Page Header -->
                 <div class="mb-8">
-                    <div class="flex justify-between items-center">
+                    <div class="flex items-center justify-between">
                         <div>
                             <h1 class="text-3xl font-bold text-gray-900">PDF Tools Management</h1>
-                            <p class="text-gray-600">Enable or disable PDF processing tools</p>
+                            <p class="text-gray-600">Configure and monitor PDF processing tools</p>
                         </div>
                         <div class="flex space-x-3">
-                            <button onclick="window.toolsComponent.enableAllTools()" class="btn-success">
+                            <button onclick="window.toolsComponent.enableAllTools()" 
+                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
                                 <i class="fas fa-check-circle mr-2"></i>
                                 Enable All
                             </button>
-                            <button onclick="window.toolsComponent.disableAllTools()" class="btn-danger">
+                            <button onclick="window.toolsComponent.disableAllTools()" 
+                                    class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
                                 <i class="fas fa-times-circle mr-2"></i>
                                 Disable All
+                            </button>
+                            <button onclick="window.toolsComponent.refreshTools()" 
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-sync mr-2"></i>
+                                Refresh
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Tools Status Overview -->
+                <!-- Tools Overview Stats -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    ${this.createToolsStatsHTML()}
+                    ${this.createToolsStatsCards(tools, stats)}
+                </div>
+
+                <!-- Tools Usage Analytics -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <!-- Usage Distribution Chart -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Tools Usage Distribution</h3>
+                        <div id="tools-usage-chart" class="chart-container h-64"></div>
+                    </div>
+                    
+                    <!-- Revenue by Tool -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Revenue by Tool</h3>
+                        <div id="tools-revenue-chart" class="chart-container h-64"></div>
+                    </div>
                 </div>
 
                 <!-- Tools Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    ${this.createToolsGridHTML()}
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    ${this.createToolsGrid(tools, stats.topOperations)}
                 </div>
 
-                <!-- Bulk Operations -->
-                <div class="mt-8 bg-white rounded-lg shadow p-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Bulk Operations</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <button onclick="window.toolsComponent.enableByCategory('Conversion')" 
-                                class="btn-secondary">
-                            <i class="fas fa-exchange-alt mr-2"></i>
-                            Enable All Conversion
-                        </button>
-                        <button onclick="window.toolsComponent.enableByCategory('Optimization')" 
-                                class="btn-secondary">
-                            <i class="fas fa-compress mr-2"></i>
-                            Enable All Optimization
-                        </button>
-                        <button onclick="window.toolsComponent.enableByCategory('Security')" 
-                                class="btn-secondary">
-                            <i class="fas fa-shield-alt mr-2"></i>
-                            Enable All Security
-                        </button>
+                <!-- Detailed Tools Table -->
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900">Tools Performance</h3>
+                            <span class="text-sm text-gray-500">${tools.length} tools configured</span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tool</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage Count</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost per Use</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${this.createToolsTableRows(tools, stats.topOperations)}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         `;
     }
 
-    createToolsStatsHTML() {
-        const enabledCount = this.tools.filter(tool => tool.enabled).length;
-        const disabledCount = this.tools.length - enabledCount;
-        const categories = [...new Set(this.tools.map(tool => tool.category))];
-        const totalRevenue = this.tools.reduce((sum, tool) => 
-            sum + (tool.enabled ? tool.operationCost * 1000 : 0), 0); // Simulated revenue
+    createToolsStatsCards(tools, stats) {
+        const enabledTools = tools.filter(tool => tool.enabled).length;
+        const totalUsage = (stats.topOperations || []).reduce((sum, op) => sum + op.count, 0);
+        const totalRevenue = (stats.topOperations || []).reduce((sum, op) => sum + (op.revenue || 0), 0);
+        const avgCostPerUse = totalUsage > 0 ? totalRevenue / totalUsage : 0;
 
-        const stats = [
+        const statsCards = [
             {
-                title: 'Total Tools',
-                value: this.tools.length,
+                title: 'Active Tools',
+                value: `${enabledTools}/${tools.length}`,
+                subtitle: 'Enabled tools',
                 icon: 'fas fa-tools',
-                color: 'blue'
-            },
-            {
-                title: 'Enabled Tools',
-                value: enabledCount,
-                icon: 'fas fa-check-circle',
                 color: 'green'
             },
             {
-                title: 'Disabled Tools',
-                value: disabledCount,
-                icon: 'fas fa-times-circle',
-                color: 'red'
+                title: 'Total Usage',
+                value: this.formatNumber(totalUsage),
+                subtitle: 'Operations processed',
+                icon: 'fas fa-chart-bar',
+                color: 'blue'
             },
             {
-                title: 'Categories',
-                value: categories.length,
-                icon: 'fas fa-layer-group',
+                title: 'Total Revenue',
+                value: `$${this.formatCurrency(totalRevenue)}`,
+                subtitle: 'From all tools',
+                icon: 'fas fa-dollar-sign',
                 color: 'purple'
+            },
+            {
+                title: 'Avg Cost',
+                value: `$${avgCostPerUse.toFixed(3)}`,
+                subtitle: 'Per operation',
+                icon: 'fas fa-calculator',
+                color: 'yellow'
             }
         ];
 
-        return stats.map(stat => `
-            <div class="stats-card bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="flex items-center justify-center h-12 w-12 rounded-md bg-${stat.color}-500 text-white">
-                            <i class="${stat.icon}"></i>
+        return statsCards.map(card => {
+            const colorClasses = {
+                green: 'border-green-500 bg-green-50 text-green-600',
+                blue: 'border-blue-500 bg-blue-50 text-blue-600',
+                purple: 'border-purple-500 bg-purple-50 text-purple-600',
+                yellow: 'border-yellow-500 bg-yellow-50 text-yellow-600'
+            };
+
+            return `
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 ${colorClasses[card.color].split(' ')[0]}">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-600">${card.title}</p>
+                            <p class="text-2xl font-bold text-gray-900">${card.value}</p>
+                            <p class="text-sm text-gray-500">${card.subtitle}</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-lg flex items-center justify-center ${colorClasses[card.color].split(' ').slice(1).join(' ')}">
+                            <i class="${card.icon}"></i>
                         </div>
                     </div>
-                    <div class="ml-4">
-                        <div class="text-sm font-medium text-gray-500">${stat.title}</div>
-                        <div class="text-2xl font-bold text-gray-900">${stat.value}</div>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-    }
-
-    createToolsGridHTML() {
-        if (this.tools.length === 0) {
-            return `
-                <div class="col-span-full text-center py-12">
-                    <i class="fas fa-tools text-6xl text-gray-300 mb-4"></i>
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Tools Found</h3>
-                    <p class="text-gray-600">No PDF tools are configured in the system.</p>
                 </div>
             `;
-        }
+        }).join('');
+    }
 
-        return this.tools.map(tool => `
-            <div class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow duration-200">
-                <div class="p-6">
+    createToolsGrid(tools, operations) {
+        return tools.map(tool => {
+            const operationData = operations?.find(op => op.operation === tool.id) || { count: 0, revenue: 0 };
+            const usageCount = operationData.count;
+            const revenue = operationData.revenue || 0;
+            const costPerUse = tool.costPerUse || 0.005; // Default cost
+            
+            return `
+                <div class="bg-white rounded-lg shadow p-6 border ${tool.enabled ? 'border-green-200' : 'border-gray-200'}">
                     <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center">
-                            <div class="flex-shrink-0">
-                                <i class="${this.getToolIcon(tool.id)} text-2xl ${tool.enabled ? 'text-blue-500' : 'text-gray-400'}"></i>
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 ${tool.enabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'} rounded-lg flex items-center justify-center">
+                                <i class="${this.getToolIcon(tool.id)}"></i>
                             </div>
-                            <div class="ml-3">
-                                <h3 class="text-lg font-medium text-gray-900">${tool.name}</h3>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                             ${this.getCategoryColor(tool.category)}">
-                                    ${tool.category}
-                                </span>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">${tool.name || this.formatToolName(tool.id)}</h4>
+                                <p class="text-sm text-gray-500">${tool.description || 'PDF processing tool'}</p>
                             </div>
                         </div>
-                        <div class="toggle-switch">
-                            <input type="checkbox" id="tool-${tool.id}" 
-                                   ${tool.enabled ? 'checked' : ''} 
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${tool.enabled ? 'checked' : ''} 
                                    onchange="window.toolsComponent.toggleTool('${tool.id}', this.checked)">
                             <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="text-center p-3 bg-blue-50 rounded-lg">
+                            <div class="text-lg font-bold text-blue-600">${this.formatNumber(usageCount)}</div>
+                            <div class="text-xs text-gray-500">Uses</div>
+                        </div>
+                        <div class="text-center p-3 bg-green-50 rounded-lg">
+                            <div class="text-lg font-bold text-green-600">$${this.formatCurrency(revenue)}</div>
+                            <div class="text-xs text-gray-500">Revenue</div>
                         </div>
                     </div>
                     
-                    <p class="text-sm text-gray-600 mb-4">${tool.description}</p>
-                    
-                    <div class="flex items-center justify-between text-sm">
-                        <div class="flex items-center">
-                            <i class="fas fa-dollar-sign text-gray-400 mr-1"></i>
-                            <span class="text-gray-600">Cost: ${window.utils.formatCurrency(tool.operationCost)}</span>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Cost per use:</span>
+                            <span class="font-medium">$${costPerUse.toFixed(3)}</span>
                         </div>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                     ${tool.enabled ? 'status-active' : 'status-inactive'}">
-                            <i class="fas fa-${tool.enabled ? 'check' : 'times'} mr-1"></i>
-                            ${tool.enabled ? 'Enabled' : 'Disabled'}
-                        </span>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Profit margin:</span>
+                            <span class="font-medium text-green-600">
+                                ${usageCount > 0 ? (((revenue - (usageCount * costPerUse)) / revenue) * 100).toFixed(1) : '0'}%
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Status:</span>
+                            <span class="font-medium ${tool.enabled ? 'text-green-600' : 'text-red-600'}">
+                                ${tool.enabled ? 'Active' : 'Disabled'}
+                            </span>
+                        </div>
                     </div>
                     
-                    <!-- Tool Actions -->
-                    <div class="mt-4 pt-4 border-t border-gray-200">
-                        <div class="flex justify-between items-center">
-                            <button onclick="window.toolsComponent.viewToolDetails('${tool.id}')" 
-                                    class="text-blue-600 hover:text-blue-800 text-sm">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                View Details
-                            </button>
-                            <button onclick="window.toolsComponent.testTool('${tool.id}')" 
-                                    class="text-green-600 hover:text-green-800 text-sm ${!tool.enabled ? 'opacity-50 cursor-not-allowed' : ''}"
-                                    ${!tool.enabled ? 'disabled' : ''}>
-                                <i class="fas fa-play mr-1"></i>
-                                Test Tool
-                            </button>
-                        </div>
+                    <div class="mt-4 flex space-x-2">
+                        <button onclick="window.toolsComponent.viewToolDetails('${tool.id}')" 
+                                class="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded text-sm hover:bg-gray-200 transition-colors">
+                            <i class="fas fa-eye mr-1"></i>
+                            Details
+                        </button>
+                        <button onclick="window.toolsComponent.configureTool('${tool.id}')" 
+                                class="flex-1 bg-blue-100 text-blue-700 px-3 py-2 rounded text-sm hover:bg-blue-200 transition-colors">
+                            <i class="fas fa-cog mr-1"></i>
+                            Configure
+                        </button>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+    }
+
+    createToolsTableRows(tools, operations) {
+        return tools.map(tool => {
+            const operationData = operations?.find(op => op.operation === tool.id) || { count: 0, revenue: 0 };
+            const usageCount = operationData.count;
+            const revenue = operationData.revenue || 0;
+            const costPerUse = tool.costPerUse || 0.005;
+            
+            return `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 ${tool.enabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'} rounded-lg flex items-center justify-center mr-3">
+                                <i class="${this.getToolIcon(tool.id)} text-xs"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-900">${tool.name || this.formatToolName(tool.id)}</div>
+                                <div class="text-sm text-gray-500">${tool.description || 'PDF processing tool'}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${tool.enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${tool.enabled ? 'Active' : 'Disabled'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatNumber(usageCount)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${this.formatCurrency(revenue)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${costPerUse.toFixed(3)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <div class="flex space-x-2">
+                            <button onclick="window.toolsComponent.toggleTool('${tool.id}', ${!tool.enabled})" 
+                                    class="text-blue-600 hover:text-blue-900">
+                                <i class="fas fa-${tool.enabled ? 'pause' : 'play'}"></i>
+                            </button>
+                            <button onclick="window.toolsComponent.configureTool('${tool.id}')" 
+                                    class="text-green-600 hover:text-green-900">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                            <button onclick="window.toolsComponent.viewToolAnalytics('${tool.id}')" 
+                                    class="text-purple-600 hover:text-purple-900">
+                                <i class="fas fa-chart-line"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async postRender() {
+        window.toolsComponent = this;
+        
+        // Add CSS for toggle switches
+        this.addToggleSwitchCSS();
+        
+        // Initialize charts
+        if (window.chartComponent && this.dashboardData) {
+            this.initializeCharts();
+        }
+    }
+
+    addToggleSwitchCSS() {
+        if (!document.getElementById('toggle-switch-css')) {
+            const style = document.createElement('style');
+            style.id = 'toggle-switch-css';
+            style.textContent = `
+                .toggle-switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 50px;
+                    height: 24px;
+                }
+                
+                .toggle-switch input {
+                    opacity: 0;
+                    width: 0;
+                    height: 0;
+                }
+                
+                .toggle-slider {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: #ccc;
+                    transition: .4s;
+                    border-radius: 24px;
+                }
+                
+                .toggle-slider:before {
+                    position: absolute;
+                    content: "";
+                    height: 18px;
+                    width: 18px;
+                    left: 3px;
+                    bottom: 3px;
+                    background-color: white;
+                    transition: .4s;
+                    border-radius: 50%;
+                }
+                
+                input:checked + .toggle-slider {
+                    background-color: #10B981;
+                }
+                
+                input:checked + .toggle-slider:before {
+                    transform: translateX(26px);
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    initializeCharts() {
+        this.renderUsageChart();
+        this.renderRevenueChart();
+    }
+
+    renderUsageChart() {
+        const operations = this.dashboardData.stats.topOperations || [];
+        
+        if (operations.length === 0) {
+            document.getElementById('tools-usage-chart').innerHTML = 
+                '<div class="flex items-center justify-center h-64 text-gray-500">No usage data available</div>';
+            return;
+        }
+
+        const data = {
+            labels: operations.map(op => this.formatToolName(op.operation)),
+            datasets: [{
+                data: operations.map(op => op.count),
+                backgroundColor: [
+                    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16'
+                ].slice(0, operations.length),
+                borderWidth: 0
+            }]
+        };
+
+        if (window.chartComponent) {
+            window.chartComponent.updateDoughnutChart(
+                document.getElementById('tools-usage-chart'),
+                data,
+                { height: 250, cutout: '50%' }
+            );
+        }
+    }
+
+    renderRevenueChart() {
+        const operations = this.dashboardData.stats.topOperations || [];
+        
+        if (operations.length === 0) {
+            document.getElementById('tools-revenue-chart').innerHTML = 
+                '<div class="flex items-center justify-center h-64 text-gray-500">No revenue data available</div>';
+            return;
+        }
+
+        const data = {
+            labels: operations.map(op => this.formatToolName(op.operation)),
+            datasets: [{
+                label: 'Revenue ($)',
+                data: operations.map(op => op.revenue || 0),
+                backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                borderColor: 'rgb(16, 185, 129)',
+                borderWidth: 1
+            }]
+        };
+
+        if (window.chartComponent) {
+            window.chartComponent.updateBarChart(
+                document.getElementById('tools-revenue-chart'),
+                data,
+                { height: 250 }
+            );
+        }
+    }
+
+    async toggleTool(toolId, enabled) {
+        try {
+            await window.adminAPI.updateToolStatus(toolId, enabled);
+            window.showNotification(
+                `Tool ${enabled ? 'enabled' : 'disabled'} successfully`,
+                'success'
+            );
+            
+            // Update local data
+            const tool = this.toolsData.tools.find(t => t.id === toolId);
+            if (tool) {
+                tool.enabled = enabled;
+            }
+            
+            // Refresh the component
+            await this.refreshTools();
+        } catch (error) {
+            window.showNotification('Failed to update tool status', 'error');
+        }
+    }
+
+    async enableAllTools() {
+        try {
+            await window.adminAPI.enableAllTools();
+            window.showNotification('All tools enabled successfully', 'success');
+            await this.refreshTools();
+        } catch (error) {
+            window.showNotification('Failed to enable all tools', 'error');
+        }
+    }
+
+    async disableAllTools() {
+        window.showConfirmation(
+            'Are you sure you want to disable all tools? This will stop all PDF processing operations.',
+            async () => {
+                try {
+                    await window.adminAPI.disableAllTools();
+                    window.showNotification('All tools disabled successfully', 'success');
+                    await this.refreshTools();
+                } catch (error) {
+                    window.showNotification('Failed to disable all tools', 'error');
+                }
+            }
+        );
+    }
+
+    async refreshTools() {
+        try {
+            const [toolsData, dashboardData] = await Promise.all([
+                window.adminAPI.getPDFTools(),
+                window.adminAPI.getDashboard()
+            ]);
+            
+            this.toolsData = toolsData;
+            this.dashboardData = dashboardData;
+            
+            // Re-render the component
+            const content = this.createToolsHTML();
+            document.getElementById('page-content').innerHTML = content;
+            await this.postRender();
+            
+            window.showNotification('Tools data refreshed successfully', 'success');
+        } catch (error) {
+            window.showNotification('Failed to refresh tools data', 'error');
+        }
+    }
+
+    viewToolDetails(toolId) {
+        const tool = this.toolsData.tools.find(t => t.id === toolId);
+        const operationData = this.dashboardData.stats.topOperations?.find(op => op.operation === toolId) || { count: 0, revenue: 0 };
+        
+        window.showConfirmation(
+            `Tool: ${tool?.name || this.formatToolName(toolId)}\n\nUsage: ${this.formatNumber(operationData.count)} operations\nRevenue: $${this.formatCurrency(operationData.revenue || 0)}\nStatus: ${tool?.enabled ? 'Active' : 'Disabled'}\n\nDescription: ${tool?.description || 'PDF processing tool'}`,
+            () => {}, // No action needed for details view
+            () => {} // No action needed for cancel
+        );
+    }
+
+    configureToolO(toolId) {
+        window.showNotification(`Tool configuration for ${this.formatToolName(toolId)} coming soon!`, 'info');
+    }
+
+    viewToolAnalytics(toolId) {
+        window.showNotification(`Analytics for ${this.formatToolName(toolId)} coming soon!`, 'info');
+    }
+
+    // Utility functions
+    formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num.toString();
+    }
+
+    formatCurrency(amount) {
+        return parseFloat(amount || 0).toFixed(2);
+    }
+
+    formatToolName(toolId) {
+        return toolId.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
     getToolIcon(toolId) {
         const icons = {
-            'convert': 'fas fa-exchange-alt',
-            'compress': 'fas fa-compress-arrows-alt',
-            'merge': 'fas fa-object-group',
-            'split': 'fas fa-cut',
-            'protect': 'fas fa-lock',
-            'unlock': 'fas fa-unlock',
-            'rotate': 'fas fa-redo',
-            'watermark': 'fas fa-tint',
-            'extract-text': 'fas fa-file-alt',
-            'sign': 'fas fa-signature',
-            'ocr': 'fas fa-eye',
-            'pagenumber': 'fas fa-list-ol'
+            'pdf-merge': 'fas fa-copy',
+            'pdf-split': 'fas fa-cut',
+            'pdf-compress': 'fas fa-compress-arrows-alt',
+            'pdf-convert': 'fas fa-exchange-alt',
+            'pdf-protect': 'fas fa-lock',
+            'pdf-unlock': 'fas fa-unlock',
+            'pdf-rotate': 'fas fa-redo',
+            'pdf-watermark': 'fas fa-tint',
+            'pdf-ocr': 'fas fa-eye',
+            'pdf-extract': 'fas fa-file-export'
         };
         return icons[toolId] || 'fas fa-file-pdf';
-    }
-
-    getCategoryColor(category) {
-        const colors = {
-            'Conversion': 'bg-blue-100 text-blue-800',
-            'Optimization': 'bg-green-100 text-green-800',
-            'Organization': 'bg-purple-100 text-purple-800',
-            'Security': 'bg-red-100 text-red-800',
-            'Editing': 'bg-yellow-100 text-yellow-800',
-            'Analysis': 'bg-indigo-100 text-indigo-800'
-        };
-        return colors[category] || 'bg-gray-100 text-gray-800';
     }
 
     createErrorHTML() {
@@ -231,210 +552,13 @@ class ToolsComponent {
                     <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
                     <h2 class="text-2xl font-bold text-gray-900 mb-2">Failed to Load Tools</h2>
                     <p class="text-gray-600 mb-4">There was an error loading the tools data.</p>
-                    <button onclick="window.adminApp.loadPage('tools')" class="btn-primary">
+                    <button onclick="window.adminApp.loadPage('tools')" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                         <i class="fas fa-redo mr-2"></i>
                         Try Again
                     </button>
                 </div>
             </div>
         `;
-    }
-
-    async postRender() {
-        // Make component available to onclick handlers
-        window.toolsComponent = this;
-    }
-
-    async toggleTool(toolId, enabled) {
-        try {
-            await window.adminAPI.updateToolStatus(toolId, enabled);
-            
-            // Update local tool status
-            const tool = this.tools.find(t => t.id === toolId);
-            if (tool) {
-                tool.enabled = enabled;
-            }
-            
-            window.showNotification(
-                `Tool ${enabled ? 'enabled' : 'disabled'} successfully`, 
-                'success'
-            );
-            
-            // Update the stats
-            this.updateStats();
-            
-        } catch (error) {
-            // Revert toggle if API call failed
-            const checkbox = document.getElementById(`tool-${toolId}`);
-            if (checkbox) {
-                checkbox.checked = !enabled;
-            }
-            
-            window.showNotification(
-                `Failed to ${enabled ? 'enable' : 'disable'} tool: ${error.message}`, 
-                'error'
-            );
-        }
-    }
-
-    async enableAllTools() {
-        window.showConfirmation(
-            'Are you sure you want to enable all PDF tools?',
-            async () => {
-                try {
-                    await window.adminAPI.enableAllTools();
-                    window.showNotification('All tools enabled successfully', 'success');
-                    window.adminApp.loadPage('tools', false);
-                } catch (error) {
-                    window.showNotification('Failed to enable all tools: ' + error.message, 'error');
-                }
-            }
-        );
-    }
-
-    async disableAllTools() {
-        window.showConfirmation(
-            'Are you sure you want to disable all PDF tools? This will prevent users from using any PDF operations.',
-            async () => {
-                try {
-                    await window.adminAPI.disableAllTools();
-                    window.showNotification('All tools disabled successfully', 'warning');
-                    window.adminApp.loadPage('tools', false);
-                } catch (error) {
-                    window.showNotification('Failed to disable all tools: ' + error.message, 'error');
-                }
-            }
-        );
-    }
-
-    async enableByCategory(category) {
-        const toolsInCategory = this.tools.filter(tool => tool.category === category);
-        const disabledTools = toolsInCategory.filter(tool => !tool.enabled);
-        
-        if (disabledTools.length === 0) {
-            window.showNotification(`All ${category} tools are already enabled`, 'info');
-            return;
-        }
-        
-        window.showConfirmation(
-            `Enable all ${disabledTools.length} disabled tools in the ${category} category?`,
-            async () => {
-                try {
-                    for (const tool of disabledTools) {
-                        await window.adminAPI.updateToolStatus(tool.id, true);
-                        tool.enabled = true;
-                    }
-                    
-                    window.showNotification(`All ${category} tools enabled successfully`, 'success');
-                    this.updateToolsDisplay();
-                    this.updateStats();
-                    
-                } catch (error) {
-                    window.showNotification(`Failed to enable ${category} tools: ${error.message}`, 'error');
-                }
-            }
-        );
-    }
-
-    viewToolDetails(toolId) {
-        const tool = this.tools.find(t => t.id === toolId);
-        if (!tool) return;
-        
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
-        
-        modal.innerHTML = `
-            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-medium text-gray-900">Tool Details</h3>
-                    <button onclick="this.parentElement.parentElement.parentElement.remove()" 
-                            class="text-gray-400 hover:text-gray-600">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="space-y-4">
-                    <div class="flex items-center">
-                        <i class="${this.getToolIcon(tool.id)} text-2xl text-blue-500 mr-3"></i>
-                        <div>
-                            <h4 class="font-medium text-gray-900">${tool.name}</h4>
-                            <p class="text-sm text-gray-600">${tool.id}</p>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Description</label>
-                        <p class="text-sm text-gray-600">${tool.description}</p>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Category</label>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${this.getCategoryColor(tool.category)}">
-                                ${tool.category}
-                            </span>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Status</label>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${tool.enabled ? 'status-active' : 'status-inactive'}">
-                                <i class="fas fa-${tool.enabled ? 'check' : 'times'} mr-1"></i>
-                                ${tool.enabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Operation Cost</label>
-                        <p class="text-sm font-medium text-gray-900">${window.utils.formatCurrency(tool.operationCost)}</p>
-                    </div>
-                </div>
-                
-                <div class="flex justify-end mt-6">
-                    <button onclick="this.parentElement.parentElement.parentElement.remove()" 
-                            class="btn-primary">
-                        Close
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Close on backdrop click
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-            }
-        });
-    }
-
-    async testTool(toolId) {
-        const tool = this.tools.find(t => t.id === toolId);
-        if (!tool || !tool.enabled) return;
-        
-        const progressNotification = window.showProgress(`Testing ${tool.name}...`);
-        
-        try {
-            // Simulate tool test (you would implement actual testing)
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            progressNotification.complete(`${tool.name} test completed successfully!`, 'success');
-        } catch (error) {
-            progressNotification.remove();
-            window.showNotification(`${tool.name} test failed: ${error.message}`, 'error');
-        }
-    }
-
-    updateStats() {
-        const statsContainer = document.querySelector('.grid.grid-cols-1.md\\:grid-cols-4.gap-6.mb-8');
-        if (statsContainer) {
-            statsContainer.innerHTML = this.createToolsStatsHTML();
-        }
-    }
-
-    updateToolsDisplay() {
-        const toolsContainer = document.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-3.gap-6');
-        if (toolsContainer) {
-            toolsContainer.innerHTML = this.createToolsGridHTML();
-        }
     }
 
     cleanup() {
