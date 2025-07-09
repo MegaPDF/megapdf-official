@@ -8,6 +8,7 @@ import (
 
 	"github.com/MegaPDF/megapdf-official/api/docs"
 	"github.com/MegaPDF/megapdf-official/api/internal/config"
+	"github.com/MegaPDF/megapdf-official/api/internal/database"
 	"github.com/MegaPDF/megapdf-official/api/internal/db"
 	"github.com/MegaPDF/megapdf-official/api/internal/routes"
 	"github.com/gin-gonic/gin"
@@ -32,7 +33,7 @@ func main() {
 
 	// Initialize SQLite database FIRST (before loading config)
 	fmt.Println("Initializing SQLite database connection...")
-	database, err := db.InitDB()
+	sqliteDB, err := db.InitDB()
 	if err != nil {
 		log.Fatalf("Failed to initialize SQLite database: %v", err)
 	}
@@ -41,6 +42,21 @@ func main() {
 	// Load configuration from .env file and environment variables
 	fmt.Println("Loading configuration...")
 	cfg := config.LoadConfig()
+
+	// Initialize MongoDB and Redis if enabled
+	if cfg.MongoEnabled {
+		fmt.Println("Initializing MongoDB connection...")
+		if err := database.InitMongoDB(cfg); err != nil {
+			log.Printf("Failed to initialize MongoDB: %v", err)
+		}
+	}
+
+	if cfg.RedisEnabled {
+		fmt.Println("Initializing Redis connection...")
+		if err := database.InitRedis(cfg); err != nil {
+			log.Printf("Failed to initialize Redis: %v", err)
+		}
+	}
 
 	// Log configuration source
 	envFile := config.GetEnvFilePath()
@@ -84,7 +100,11 @@ func main() {
 	}
 	// Set up routes with current configuration
 	fmt.Println("Setting up routes...")
-	routes.SetupRoutes(r, database, cfg)
+	routes.SetupRoutes(r, sqliteDB, cfg)
+
+	// Set up social network routes
+	fmt.Println("Setting up social network routes...")
+	routes.SetupSocialRoutes(r, sqliteDB, cfg)
 
 	// Print registered routes
 	printRoutes(r)
@@ -96,7 +116,7 @@ func main() {
 	// Uncomment the following lines if you want to migrate .env values to database
 	/*
 		fmt.Println("Checking for environment variable migration...")
-		if err := db.MigrateEnvToSettings(database); err != nil {
+		if err := db.MigrateEnvToSettings(sqliteDB); err != nil {
 			log.Printf("Warning: Failed to migrate environment variables: %v", err)
 		}
 	*/

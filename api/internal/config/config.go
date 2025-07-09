@@ -38,6 +38,25 @@ type Config struct {
 	// SQLite Database config (simplified from MySQL)
 	DBPath string // Single path instead of host/port/user/password
 
+	// MongoDB configuration
+	MongoURI      string
+	MongoDBName   string
+	MongoEnabled  bool
+
+	// Redis configuration
+	RedisAddr     string
+	RedisPassword string
+	RedisDB       int
+	RedisEnabled  bool
+
+	// AWS S3 configuration
+	AWSRegion          string
+	AWSAccessKeyID     string
+	AWSSecretAccessKey string
+	S3Bucket           string
+	S3Endpoint         string
+	S3Enabled          bool
+
 	// App configuration
 	SiteName                 string
 	SiteDescription          string
@@ -102,6 +121,25 @@ func LoadConfig() *Config {
 
 		// SQLite Database config
 		DBPath: dbPath,
+
+		// MongoDB configuration
+		MongoURI:     getEnv("MONGO_URI", "mongodb://localhost:27017"),
+		MongoDBName:  getEnv("MONGO_DB_NAME", "megapdf_social"),
+		MongoEnabled: getEnv("MONGO_ENABLED", "false") == "true",
+
+		// Redis configuration
+		RedisAddr:     getEnv("REDIS_ADDR", "localhost:6379"),
+		RedisPassword: getEnv("REDIS_PASSWORD", ""),
+		RedisDB:       getIntEnv("REDIS_DB", 0),
+		RedisEnabled:  getEnv("REDIS_ENABLED", "false") == "true",
+
+		// AWS S3 configuration
+		AWSRegion:          getEnv("AWS_REGION", "us-east-1"),
+		AWSAccessKeyID:     getEnv("AWS_ACCESS_KEY_ID", ""),
+		AWSSecretAccessKey: getEnv("AWS_SECRET_ACCESS_KEY", ""),
+		S3Bucket:           getEnv("S3_BUCKET", ""),
+		S3Endpoint:         getEnv("S3_ENDPOINT", ""),
+		S3Enabled:          getEnv("S3_ENABLED", "false") == "true",
 
 		// App configuration with defaults
 		SiteName:                 getEnv("SITE_NAME", "MegaPDF"),

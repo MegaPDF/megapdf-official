@@ -31,6 +31,9 @@ func createIndexes(db *gorm.DB) error {
 				"role",
 				"email",
 				"free_operations_reset",
+				"username",
+				"is_active",
+				"is_suspended",
 			},
 			"api_keys": {
 				"user_id",
@@ -56,6 +59,54 @@ func createIndexes(db *gorm.DB) error {
 			"password_reset_tokens": {
 				"email",
 				"expires",
+			},
+			// Social Network Tables
+			"user_profiles": {
+				"user_id",
+				"is_private",
+				"is_verified",
+			},
+			"posts": {
+				"user_id",
+				"status",
+				"is_public",
+				"created_at",
+			},
+			"comments": {
+				"post_id",
+				"user_id",
+				"parent_id",
+				"status",
+				"created_at",
+			},
+			"likes": {
+				"user_id",
+				"post_id",
+				"comment_id",
+				"created_at",
+			},
+			"follows": {
+				"follower_id",
+				"following_id",
+				"status",
+				"created_at",
+			},
+			"notifications": {
+				"user_id",
+				"type",
+				"read",
+				"created_at",
+			},
+			"reports": {
+				"user_id",
+				"post_id",
+				"comment_id",
+				"status",
+				"created_at",
+			},
+			"settings": {
+				"key",
+				"is_public",
 			},
 		}
 
@@ -151,6 +202,15 @@ func InitDB() (*gorm.DB, error) {
 		&models.PDFToolSettings{},
 		&models.AdminSettings{},
 		&models.BrandingSetting{},
+		// Social Network Models
+		&models.UserProfile{},
+		&models.Post{},
+		&models.Comment{},
+		&models.Like{},
+		&models.Follow{},
+		&models.Notification{},
+		&models.Report{},
+		&models.Settings{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to auto-migrate database schema: %w", err)

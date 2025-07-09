@@ -548,3 +548,28 @@ func (h *AuthHandler) GetResetTokenInfo(c *gin.Context) {
 func (h *AuthHandler) SetEmailService(emailService *services.EmailService) {
 	h.emailService = emailService
 }
+
+// ResendVerification resends email verification
+func (h *AuthHandler) ResendVerification(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "Resend verification - not implemented yet"})
+}
+
+// ForgotPassword handles forgot password
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "Forgot password - not implemented yet"})
+}
+
+// RefreshToken refreshes JWT token
+func (h *AuthHandler) RefreshToken(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "Refresh token - not implemented yet"})
+}
+
+// GetProfile gets user profile
+func (h *AuthHandler) GetProfile(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "Get profile - not implemented yet"})
+}
+
+// ChangePassword changes user password
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "Change password - not implemented yet"})
+}

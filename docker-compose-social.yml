@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # Main Application
+  app:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DEBUG=true
+      - DB_PATH=/app/data/megapdf.db
+      - MONGO_ENABLED=true
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DB_NAME=megapdf_social
+      - REDIS_ENABLED=true
+      - REDIS_ADDR=redis:6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - SITE_NAME=MegaPDF Social
+      - APP_URL=http://localhost:3000
+      - API_URL=http://localhost:8080
+    volumes:
+      - ./api/data:/app/data
+      - ./api/uploads:/app/uploads
+      - ./api/public:/app/public
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
+
+  # MongoDB for social network data
+  mongodb:
+    image: mongo:7.0
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+      - MONGO_INITDB_DATABASE=megapdf_social
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+
+  # Redis for caching
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # MongoDB Admin Interface (optional)
+  mongo-express:
+    image: mongo-express:latest
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=admin
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=password
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  # Redis Admin Interface (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  default:
+    name: megapdf_social_network
