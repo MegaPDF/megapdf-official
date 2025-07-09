@@ -68,7 +68,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			c.Next()
 		})
 	}
-
+	r.Static("/uploads", "./public/uploads")
 	r.Static("/admin-assets", "./templates/assets")
 	// Load HTML templates with proper pattern
 	r.LoadHTMLGlob("templates/*.html")
@@ -121,6 +121,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			pricing.GET("", pricingHandler.GetPublicPricing)                         // GET /api/pricing
 			pricing.GET("/operation/:operation", pricingHandler.GetOperationPricing) // GET /api/pricing/operation/compress
 			pricing.POST("/calculate", pricingHandler.CalculatePricing)              // POST /api/pricing/calculate
+		}
+		branding := api.Group("/branding")
+		{
+			branding.GET("/branding", adminHandler.GetBranding)
 		}
 		api.GET("/tools/status", toolStatusHandler.GetToolStatus)
 		api.POST("/validate-key", keyValidationHandler.ValidateKey)

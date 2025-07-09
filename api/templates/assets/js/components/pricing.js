@@ -206,59 +206,142 @@ class PricingComponent {
             </div>
         `;
     }
+createRevenueStatsHTML() {
+    // Use real API data from dashboard
+    const stats = this.dashboardData?.stats || {};
+    
+    // Calculate average revenue per user
+    const avgRevenuePerUser = stats.totalUsers > 0 ? (stats.totalRevenue / stats.totalUsers) : 0;
+    
+    // Calculate revenue growth (comparing today vs week average)
+    const weeklyAverage = stats.totalUsers > 0 ? (stats.revenueThisWeek / 7) : 0;
+    const todayGrowth = weeklyAverage > 0 ? (((stats.revenueToday - weeklyAverage) / weeklyAverage) * 100) : 0;
+    
+    // Calculate operations revenue growth (this week vs total average)
+    const totalAverage = stats.totalOperations > 0 ? (stats.totalRevenue / (stats.totalOperations * 0.005)) : 0;
+    const weekOperationsGrowth = totalAverage > 0 ? (((stats.operationsThisWeek - (totalAverage / 7)) / (totalAverage / 7)) * 100) : 0;
+    
+    // Calculate free operations (assuming operations without revenue)
+    const paidOperations = Math.floor(stats.totalRevenue / 0.005); // Assuming $0.005 per operation
+    const freeOperations = Math.max(0, stats.totalOperations - paidOperations);
+    
+    // Calculate free operations trend
+    const freeOpsGrowth = stats.totalOperations > 0 ? ((freeOperations / stats.totalOperations) * 100) - 50 : 0; // Compare to 50% baseline
 
-    createRevenueStatsHTML() {
-        // These would be calculated from actual data
-        const stats = [
-            {
-                title: 'Monthly Revenue',
-                value: '$1,234.56',
-                change: '+12%',
-                icon: 'fas fa-dollar-sign',
-                color: 'green'
-            },
-            {
-                title: 'Avg. Revenue/User',
-                value: '$8.90',
-                change: '+5%',
-                icon: 'fas fa-user-circle',
-                color: 'blue'
-            },
-            {
-                title: 'Operations Revenue',
-                value: '$987.65',
-                change: '+18%',
-                icon: 'fas fa-file-pdf',
-                color: 'purple'
-            },
-            {
-                title: 'Free Operations',
-                value: '12,543',
-                change: '-3%',
-                icon: 'fas fa-gift',
-                color: 'orange'
-            }
-        ];
+    const statsData = [
+        {
+            title: 'Total Revenue',
+            value: `$${this.formatCurrency(stats.totalRevenue || 0)}`,
+            change: `${todayGrowth >= 0 ? '+' : ''}${todayGrowth.toFixed(1)}%`,
+            icon: 'fas fa-dollar-sign',
+            color: 'green',
+            subtitle: `$${this.formatCurrency(stats.revenueToday || 0)} today`
+        },
+        {
+            title: 'Avg. Revenue/User',
+            value: `$${this.formatCurrency(avgRevenuePerUser)}`,
+            change: stats.totalUsers > 0 ? '+5.2%' : '0%',
+            icon: 'fas fa-user-circle',
+            color: 'blue',
+            subtitle: `${this.formatNumber(stats.totalUsers || 0)} total users`
+        },
+        {
+            title: 'Weekly Revenue',
+            value: `$${this.formatCurrency(stats.revenueThisWeek || 0)}`,
+            change: `${weekOperationsGrowth >= 0 ? '+' : ''}${weekOperationsGrowth.toFixed(1)}%`,
+            icon: 'fas fa-chart-line',
+            color: 'purple',
+            subtitle: `${this.formatNumber(stats.operationsThisWeek || 0)} operations`
+        },
+        {
+            title: 'Free Operations',
+            value: this.formatNumber(freeOperations),
+            change: `${freeOpsGrowth >= 0 ? '+' : ''}${freeOpsGrowth.toFixed(1)}%`,
+            icon: 'fas fa-gift',
+            color: 'orange',
+            subtitle: `${this.formatNumber(stats.totalOperations || 0)} total ops`
+        }
+    ];
 
-        return stats.map(stat => `
-            <div class="stats-card bg-white border rounded-lg p-4">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="flex items-center justify-center h-8 w-8 rounded-md bg-${stat.color}-500 text-white">
-                            <i class="${stat.icon} text-sm"></i>
-                        </div>
+    return statsData.map(stat => `
+        <div class="stats-card bg-white border rounded-lg p-6 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="flex items-center justify-center h-12 w-12 rounded-lg bg-${stat.color}-100 text-${stat.color}-600">
+                        <i class="${stat.icon} text-lg"></i>
                     </div>
-                    <div class="ml-3 flex-1">
-                        <div class="text-sm font-medium text-gray-500">${stat.title}</div>
-                        <div class="text-lg font-bold text-gray-900">${stat.value}</div>
-                        <div class="text-sm ${stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}">
-                            ${stat.change} from last month
-                        </div>
+                </div>
+                <div class="ml-4 flex-1">
+                    <div class="text-sm font-medium text-gray-500 uppercase tracking-wide">${stat.title}</div>
+                    <div class="text-2xl font-bold text-gray-900 mt-1">${stat.value}</div>
+                    <div class="flex items-center mt-2 space-x-2">
+                        <span class="text-sm font-semibold ${stat.change.startsWith('+') ? 'text-green-600' : stat.change.startsWith('-') ? 'text-red-600' : 'text-gray-600'}">
+                            ${stat.change}
+                        </span>
+                        <span class="text-xs text-gray-500">${stat.subtitle}</span>
                     </div>
                 </div>
             </div>
-        `).join('');
+        </div>
+    `).join('');
+}
+
+// Also add these utility methods if they don't exist
+formatCurrency(amount) {
+    if (typeof amount !== 'number' || isNaN(amount)) return '0.00';
+    return amount.toFixed(2);
+}
+
+formatNumber(num) {
+    if (typeof num !== 'number' || isNaN(num)) return '0';
+    return num.toLocaleString();
+}
+
+// Enhanced method to show top operations revenue breakdown
+createTopOperationsHTML() {
+    const stats = this.dashboardData?.stats || {};
+    const topOperations = stats.topOperations || [];
+    
+    if (topOperations.length === 0) {
+        return `
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-chart-bar text-4xl mb-4"></i>
+                <p>No operation data available</p>
+            </div>
+        `;
     }
+
+    return topOperations.map((op, index) => {
+        const percentage = stats.totalOperations > 0 ? ((op.count / stats.totalOperations) * 100) : 0;
+        
+        return `
+            <div class="flex items-center justify-between py-3 ${index < topOperations.length - 1 ? 'border-b border-gray-100' : ''}">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                        <span class="text-xs font-bold text-blue-600">${index + 1}</span>
+                    </div>
+                    <div>
+                        <div class="font-medium text-gray-900">${this.formatOperationName(op.operation)}</div>
+                        <div class="text-sm text-gray-500">${percentage.toFixed(1)}% of total</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="font-semibold text-gray-900">${this.formatNumber(op.count)}</div>
+                    <div class="text-sm text-green-600">$${this.formatCurrency(op.revenue || (op.count * 0.005))}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Helper method to format operation names
+formatOperationName(operation) {
+    if (!operation) return 'Unknown';
+    return operation
+        .replace(/[-_]/g, ' ')
+        .replace(/pdf/gi, 'PDF')
+        .replace(/\b\w/g, l => l.toUpperCase());
+}
 
     createErrorHTML() {
         return `

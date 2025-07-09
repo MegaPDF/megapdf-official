@@ -1,8 +1,10 @@
+// components/pro-header.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +16,7 @@ import {
 } from "@radix-ui/react-icons";
 import {
   FileText,
-  Image,
+  Image as ImageIcon,
   Table,
   ArrowRight,
   ArrowDown,
@@ -41,6 +43,7 @@ import { LogoutButton } from "./auth/logout-button";
 import { LineShadowText } from "@/src/components/magicui/line-shadow-text";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/src/context/auth-context";
+import { useBranding } from "@/src/context/branding-context";
 
 type ToolDefinition = {
   name: string;
@@ -69,6 +72,7 @@ interface ProHeaderProps {
 export function ProHeader({ urlLanguage }: ProHeaderProps) {
   const theme = useTheme();
   const { language, setLanguage, t } = useLanguageStore();
+  const { branding, loading, error } = useBranding();
   const { isAuthenticated, user, isLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -99,133 +103,102 @@ export function ProHeader({ urlLanguage }: ProHeaderProps) {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-2">
           <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">
-            {user.name ? user.name[0].toUpperCase() : "A"}
+            {user.name
+              ? user.name.charAt(0).toUpperCase()
+              : user.email?.charAt(0).toUpperCase()}
           </div>
-          <span className="hidden sm:inline">{user.name || "Account"}</span>
-          <ChevronDownIcon className="h-4 w-4 opacity-70" />
+          {user.name || user.email}
+          <ChevronDownIcon className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem asChild>
-          <LanguageLink href="/dashboard">Dashboard</LanguageLink>
+        <DropdownMenuItem>
+          <Link href="/dashboard" className="flex w-full">
+            {t("nav.dashboard") || "Dashboard"}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Link href="/profile" className="flex w-full">
+            {t("nav.profile") || "Profile"}
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <div className="mt-auto border-t p-4">
-            <LogoutButton />
-          </div>
+          <LogoutButton />
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   ) : (
-    <LanguageLink href="/login" passHref>
-      <Button variant="default" size="sm">
-        Sign in
-      </Button>
-    </LanguageLink>
+    <div className="flex items-center gap-2">
+      <LanguageLink href="/login">
+        <Button variant="ghost" size="sm">
+          {t("nav.login") || "Sign In"}
+        </Button>
+      </LanguageLink>
+      <LanguageLink href="/register">
+        <Button size="sm">{t("nav.signup") || "Sign Up"}</Button>
+      </LanguageLink>
+    </div>
   );
-
-  const languages: LanguageOption[] = [
-    { code: "en", name: "English", nativeName: "English", flag: "🇺🇸" },
-    {
-      code: "id",
-      name: "Indonesian",
-      nativeName: "Bahasa Indonesia",
-      flag: "🇮🇩",
-    },
-    { code: "es", name: "Spanish", nativeName: "Español", flag: "🇪🇸" },
-    { code: "fr", name: "French", nativeName: "Français", flag: "🇫🇷" },
-    { code: "zh", name: "Chinese", nativeName: "中文 (Zhōngwén)", flag: "🇨🇳" },
-    {
-      code: "ar",
-      name: "Arabic",
-      nativeName: "العربية (al-ʿArabiyyah)",
-      flag: "🇸🇦",
-    },
-    { code: "hi", name: "Hindi", nativeName: "हिन्दी (Hindī)", flag: "🇮🇳" },
-    {
-      code: "ru",
-      name: "Russian",
-      nativeName: "Русский (Russkiy)",
-      flag: "🇷🇺",
-    },
-    { code: "pt", name: "Portuguese", nativeName: "Português", flag: "🇧🇷" },
-    { code: "de", name: "German", nativeName: "Deutsch", flag: "🇩🇪" },
-    {
-      code: "ja",
-      name: "Japanese",
-      nativeName: "日本語 (Nihongo)",
-      flag: "🇯🇵",
-    },
-    { code: "ko", name: "Korean", nativeName: "한국어 (Hangugeo)", flag: "🇰🇷" },
-    { code: "it", name: "Italian", nativeName: "Italiano", flag: "🇮🇹" },
-    { code: "tr", name: "Turkish", nativeName: "Türkçe", flag: "🇹🇷" },
-  ];
 
   const PDF_TOOLS: CategoryDefinition[] = [
     {
-      category: isClient
-        ? t("pdfTools.categories.convertFromPdf")
-        : "Convert PDF",
-      description:
-        t("pdfTools.categories.convertFromPdfDesc") ||
-        "Convert PDF files to various formats and vice versa",
+      category: t("pdfTools.categories.convertFromPdf") || "Convert PDF",
+      description: "Convert PDF files to various formats",
       tools: [
         {
+          name: t("popular.pdfToJpg"),
+          href: "/pdf-to-jpg",
+          icon: <ImageIcon className="h-5 w-5 text-blue-500" />,
+          description: t("popular.pdfToJpgDesc"),
+        },
+        {
           name: t("popular.pdfToWord"),
-          href: "/convert/pdf-to-docx",
+          href: "/pdf-to-word",
           icon: <FileText className="h-5 w-5 text-blue-500" />,
           description: t("popular.pdfToWordDesc"),
         },
         {
           name: t("popular.pdfToExcel"),
-          href: "/convert/pdf-to-xlsx",
+          href: "/pdf-to-excel",
           icon: <Table className="h-5 w-5 text-green-500" />,
           description: t("popular.pdfToExcelDesc"),
         },
         {
-          name: t("popular.pdfToJpg"),
-          href: "/convert/pdf-to-jpg",
-          icon: <Image className="h-5 w-5 text-yellow-500" />,
-          description: t("popular.pdfToJpgDesc"),
-        },
-        {
-          name: t("popular.wordToPdf"),
-          href: "/convert/docx-to-pdf",
-          icon: <FileText className="h-5 w-5 text-blue-500" />,
-          description: t("popular.wordToPdfDesc"),
-        },
-        {
-          name: t("popular.jpgToPdf"),
-          href: "/convert/jpg-to-pdf",
-          icon: <Image className="h-5 w-5 text-yellow-500" />,
-          description: t("popular.jpgToPdfDesc"),
+          name: t("popular.pdfToPpt"),
+          href: "/pdf-to-ppt",
+          icon: <FileBoxIcon className="h-5 w-5 text-orange-500" />,
+          description: t("popular.pdfToPptDesc"),
         },
       ],
     },
     {
       category: t("pdfTools.categories.organizePdf") || "PDF Management",
-      description:
-        t("pdfTools.categories.organizePdfDesc") ||
-        "Tools to organize and modify PDF files",
+      description: "Organize and manage your PDF files",
       tools: [
         {
           name: t("popular.mergePdf"),
           href: "/merge-pdf",
-          icon: <ArrowRight className="h-5 w-5 text-red-500" />,
+          icon: <ArrowDown className="h-5 w-5 text-green-500" />,
           description: t("popular.mergePdfDesc"),
         },
         {
           name: t("popular.splitPdf"),
           href: "/split-pdf",
-          icon: <ArrowDown className="h-5 w-5 text-green-500" />,
+          icon: <ArrowRight className="h-5 w-5 text-red-500" />,
           description: t("popular.splitPdfDesc"),
         },
         {
           name: t("popular.compressPdf"),
           href: "/compress-pdf",
-          icon: <Download className="h-5 w-5 text-purple-500" />,
+          icon: <Download className="h-5 w-5 text-blue-500" />,
           description: t("popular.compressPdfDesc"),
+        },
+        {
+          name: t("popular.rotatePdf"),
+          href: "/rotate",
+          icon: <ArrowRight className="h-5 w-5 rotate-45 text-blue-500" />,
+          description: t("popular.rotatePdfDesc"),
         },
       ],
     },
@@ -288,8 +261,73 @@ export function ProHeader({ urlLanguage }: ProHeaderProps) {
     },
   ];
 
+  // Show loading skeleton for logo area if branding is loading
+  const LogoComponent = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center gap-2">
+          <div className="animate-pulse">
+            <div className="h-8 w-8 bg-gray-300 rounded"></div>
+          </div>
+          <div className="animate-pulse">
+            <div className="h-6 w-24 bg-gray-300 rounded"></div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <LanguageLink href="/" className="flex items-center gap-2">
+        {branding.logoUrl && (
+          <img
+            src={`${process.env.NEXT_PUBLIC_API_URL || ""}${branding.logoUrl}`}
+            alt={branding.logoAltText}
+            width={32}
+            height={32}
+            className="h-8 w-8 object-contain"
+          />
+        )}
+        <span className="font-bold text-xl flex items-center gap-1">
+          <span className="text-balance text-3xl font-semibold leading-none tracking-tighter sm:text-4xl md:text-4xl lg:text-2xl">
+            <LineShadowText className="italic" shadowColor={shadowColor}>
+              {branding.appName}
+            </LineShadowText>
+          </span>
+        </span>
+      </LanguageLink>
+    );
+  };
+
   return (
     <>
+      {/* App Download Banner */}
+      {showAppBanner && (
+        <div className="bg-primary text-primary-foreground px-4 py-2 text-center text-sm relative">
+          <div className="flex items-center justify-center gap-2">
+            <MobileIcon className="h-4 w-4" />
+            <span>
+              {t("header.downloadApp") ||
+                "Download our mobile app for iOS and Android"}
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="ml-2 h-6 px-2 text-xs"
+            >
+              {t("header.getApp") || "Get App"}
+            </Button>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
+            onClick={() => setShowAppBanner(false)}
+          >
+            <Cross1Icon className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
+
       {/* Main Header */}
       <header
         className={`sticky top-0 z-50 bg-gradient-to-r from-background/95 to-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/60 ${
@@ -299,92 +337,71 @@ export function ProHeader({ urlLanguage }: ProHeaderProps) {
         <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between py-4 px-4">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <LanguageLink href="/" className="flex items-center gap-2">
-              <span className="font-bold text-xl flex items-center gap-1">
-                <span className="text-balance text-3xl font-semibold leading-none tracking-tighter sm:text-4xl md:text-4xl lg:text-2xl">
-                  <LineShadowText className="italic" shadowColor={shadowColor}>
-                    MegaPDF
-                  </LineShadowText>
-                </span>
-              </span>
-            </LanguageLink>
+            <LogoComponent />
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
-            {/* Direct link to Image Tools */}
+            {/* Navigation items with dropdowns */}
+            {navItems.map((item, index) => (
+              <DropdownMenu key={index}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="gap-1">
+                    {item.label}
+                    <ChevronDownIcon className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-80 p-4">
+                  {item.dropdown.map((category, catIndex) => (
+                    <div key={catIndex} className="mb-4 last:mb-0">
+                      <h4 className="font-medium mb-2 text-sm">
+                        {category.category}
+                      </h4>
+                      <div className="grid gap-1">
+                        {category.tools.map((tool, toolIndex) => (
+                          <DropdownMenuItem key={toolIndex} asChild>
+                            <LanguageLink
+                              href={tool.href}
+                              className="flex items-center gap-3 p-2 rounded-md hover:bg-muted"
+                            >
+                              {tool.icon}
+                              <div>
+                                <div className="font-medium text-sm">
+                                  {tool.name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {tool.description}
+                                </div>
+                              </div>
+                            </LanguageLink>
+                          </DropdownMenuItem>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ))}
+
+            {/* Direct link to Pricing */}
             <LanguageLink
               href="/pricing"
               className="text-sm font-medium text-foreground transition-colors hover:text-primary"
             >
               {isClient ? t("nav.pricing") || "Pricing" : "Pricing"}
             </LanguageLink>
-            {/* PDF Tool Dropdowns */}
-            {navItems.slice(1).map((item) => (
-              <div key={item.label} className="relative group">
-                {item.dropdown && (
-                  <>
-                    <LanguageLink
-                      href="#"
-                      className="text-sm font-medium text-foreground transition-colors hover:text-primary flex items-center gap-1"
-                    >
-                      {item.label}
-                      <ChevronDownIcon className="h-4 w-4 opacity-70" />
-                    </LanguageLink>
-
-                    {/* Dropdown Menu */}
-                    <div className="absolute top-full left-0 mt-2 w-[600px] bg-background border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 p-4">
-                      {item.dropdown.map((category) => (
-                        <div key={category.category} className="mb-4">
-                          <div className="font-semibold text-sm text-foreground mb-2">
-                            {category.category}
-                          </div>
-                          <div className="grid grid-cols-3 gap-4">
-                            {category.tools.map((tool) => (
-                              <LanguageLink
-                                key={tool.name}
-                                href={tool.href}
-                                className="flex items-start gap-3 p-2 hover:bg-muted rounded-md transition-colors"
-                              >
-                                <div className="p-1 rounded-md bg-primary/10">
-                                  {tool.icon}
-                                </div>
-                                <div>
-                                  <div className="text-sm font-medium">
-                                    {tool.name}
-                                  </div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {tool.description}
-                                  </p>
-                                </div>
-                              </LanguageLink>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-            <LanguageLink
-              href="/pdf-tools"
-              className="text-sm font-medium text-foreground transition-colors hover:text-primary"
-            >
-              {isClient
-                ? t("popular.viewAll") || "View All PDF Tools"
-                : "View All PDF Tools"}
-            </LanguageLink>
           </nav>
 
-          {/* Right Side Actions */}
-          <div className="flex items-center gap-3">
+          {/* Right side controls */}
+          <div className="flex items-center gap-2">
             <LanguageSwitcher />
             <ModeToggle />
             {userMenu}
+
+            {/* Mobile menu button */}
             <Button
-              variant="outline"
-              size="icon"
+              variant="ghost"
+              size="sm"
               className="md:hidden"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
@@ -393,60 +410,56 @@ export function ProHeader({ urlLanguage }: ProHeaderProps) {
               ) : (
                 <HamburgerMenuIcon className="h-5 w-5" />
               )}
-              <span className="sr-only">Toggle menu</span>
             </Button>
           </div>
         </div>
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-16 left-0 w-full bg-background/95 backdrop-blur border-t max-h-[calc(100vh-4rem)] overflow-y-auto shadow-md">
-            <div className="container max-w-6xl mx-auto py-4 space-y-4">
-              {/* Direct link to Image Tools */}
-              <LanguageLink
-                href="/pricing"
-                className="block px-3 py-3 text-lg font-medium hover:bg-primary/5 rounded-md transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {isClient ? t("nav.pricing") || "Pricing" : "Pricing"}
-              </LanguageLink>
-              {navItems.slice(1).map((item) => (
-                <div key={item.label} className="space-y-2">
-                  <div className="block px-3 py-3 text-lg font-medium hover:bg-primary/5 rounded-md transition-colors">
-                    {item.label}
-                  </div>
-                  {item.dropdown && (
+          <div className="md:hidden border-t bg-background/95 backdrop-blur">
+            <div className="container max-w-6xl mx-auto px-4 py-4">
+              <div className="flex flex-col space-y-4">
+                {navItems.map((item, index) => (
+                  <div key={index}>
+                    <h4 className="font-medium mb-2">{item.label}</h4>
                     <div className="pl-4 space-y-2">
-                      {item.dropdown.map((category) => (
-                        <div key={category.category}>
-                          <div className="text-sm font-medium text-primary mb-2">
-                            {category.category}
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            {category.tools.map((tool) => (
-                              <LanguageLink
-                                key={tool.name}
-                                href={tool.href}
-                                className="flex items-start gap-3 p-2 hover:bg-muted rounded-md transition-colors"
-                                onClick={() => setMobileMenuOpen(false)}
-                              >
-                                <div className="p-1 rounded-md bg-primary/10">
-                                  {tool.icon}
-                                </div>
-                                <div>
-                                  <div className="text-sm font-medium">
-                                    {tool.name}
-                                  </div>
-                                </div>
-                              </LanguageLink>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                      {item.dropdown.flatMap((category) =>
+                        category.tools.map((tool, toolIndex) => (
+                          <LanguageLink
+                            key={toolIndex}
+                            href={tool.href}
+                            className="flex items-center gap-3 p-2 rounded-md hover:bg-muted text-sm"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            {tool.icon}
+                            {tool.name}
+                          </LanguageLink>
+                        ))
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                ))}
+
+                <LanguageLink
+                  href="/pricing"
+                  className="font-medium text-foreground transition-colors hover:text-primary"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {t("nav.pricing") || "Pricing"}
+                </LanguageLink>
+
+                {branding.contact.supportUrl && (
+                  <a
+                    href={branding.contact.supportUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-foreground transition-colors hover:text-primary"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {t("nav.support") || "Support"}
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         )}

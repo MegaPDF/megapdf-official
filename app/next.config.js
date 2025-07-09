@@ -2,7 +2,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
+  //output: 'standalone',
   basePath: '',
   // assetPrefix: 'https://mega-pdf.com/',
   eslint: {

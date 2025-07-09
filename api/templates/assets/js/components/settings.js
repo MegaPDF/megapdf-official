@@ -84,8 +84,8 @@ class SettingsComponent {
 
     createTabContent() {
         switch (this.currentTab) {
-            case 'general':
-                return this.createGeneralSettings();
+            // case 'general':
+            //     return this.createGeneralSettings();
             case 'email':
                 return this.createEmailSettings();
             case 'payment':
