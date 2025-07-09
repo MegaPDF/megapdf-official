@@ -6,6 +6,13 @@
 /.pnp
 .pnp.js
 .yarn/install-state.gz
+
+# Build files
+/api/main
+/api/api
+/api/cmd/api/main
+/api/cmd/api/api
+
 # Environment Variables
 /api/public
 /api/backups
